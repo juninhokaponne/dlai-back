@@ -5,11 +5,12 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "types": ["node"],
 
     // Strictness (fundamental)
-    "strict": "true",
+    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicityOverride": true,
+    "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
 
     // Interoperabilidade
@@ -33,6 +34,6 @@
     // Perfomance
     "incremental": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "drizzle.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
