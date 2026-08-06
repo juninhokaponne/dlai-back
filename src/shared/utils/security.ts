@@ -17,8 +17,6 @@ export async function verifyPassword(
   password: string,
   hashStr: string,
 ): Promise<boolean> {
-  console.log("hashStr", hashStr);
-  console.log("password", password);
   return await verify(hashStr, password);
 }
 
