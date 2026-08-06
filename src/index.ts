@@ -1,41 +1,16 @@
-import express from "express";
-import { db } from "./database/index.js";
-import { users } from "./database/schema/schema.js";
+import { startServer } from "./server.js";
 
-const app = express();
-const port = 3000;
-
-app.use(express.json());
-
-app.get("/health", async (req, res) => {
-  const ip = req.ip;
-
-  try {
-    const createUser = await db.insert(users).values({
-      name: "Gilson",
-      lastName: "Oliveira",
-      age: 25,
-      email: "gilson@email.com",
-      passwordHash: "hash",
-    });
-
-    if (createUser.rowCount == 0) {
-      throw new Error("Error creating user!");
-    }
-
-    const user = await db.select().from(users);
-
-    console.log(user);
-
-    res.json({
-      ip,
-      message: user,
-    });
-  } catch (err) {
-    console.error(err);
-  }
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection: ", reason);
+  process.exit(1);
 });
 
-app.listen(port, () => {
-  console.log(`App running at port ${port}`);
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception: ", err);
+  process.exit(1);
+});
+
+startServer().catch((err) => {
+  console.error("Failed to start server", err);
+  process.exit(1);
 });
