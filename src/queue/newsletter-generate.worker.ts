@@ -9,6 +9,8 @@ import {
   NEWSLETTER_GENERATE_QUEUE,
   type NewsletterGenerateJobData,
 } from "./newsletter-generate.queue.js";
+import { creditCredits } from "../shared/billing/credits.service.js";
+import { GENERATION_CREDIT_COST } from "../shared/billing/credits.config.js";
 
 const aiService = new AIService(new OpenRouterProvider());
 
@@ -72,6 +74,13 @@ export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobDat
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, job.data.newsletterId));
+
+    await creditCredits(
+      job.data.userId,
+      GENERATION_CREDIT_COST,
+      "generation_refund",
+      job.data.newsletterId,
+    );
   });
 
   return worker;

@@ -5,6 +5,8 @@ import { db } from "../../database/index.js";
 import { newsletters } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { getNewsletterGenerateQueue } from "../../queue/newsletter-generate.queue.js";
+import { debitCredits } from "../../shared/billing/credits.service.js";
+import { GENERATION_CREDIT_COST } from "../../shared/billing/credits.config.js";
 
 const idParamSchema = z.string().uuid();
 
@@ -123,6 +125,13 @@ export class NewsletterController {
           .json({ error: "Generation already in progress for this newsletter." });
       }
 
+      const remainingCredits = await debitCredits(
+        req.user!.userId,
+        GENERATION_CREDIT_COST,
+        "generation_debit",
+        newsletter.id,
+      );
+
       const [updated] = await db
         .update(newsletters)
         .set({ status: "generating", updatedAt: new Date() })
@@ -131,9 +140,12 @@ export class NewsletterController {
 
       await getNewsletterGenerateQueue().add("generate", {
         newsletterId: newsletter.id,
+        userId: req.user!.userId,
       });
 
-      return res.status(202).json({ newsletter: updated });
+      return res
+        .status(202)
+        .json({ newsletter: updated, creditBalance: remainingCredits });
     } catch (err) {
       next(err);
     }

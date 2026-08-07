@@ -5,6 +5,7 @@ export const NEWSLETTER_GENERATE_QUEUE = "newsletter-generate";
 
 export interface NewsletterGenerateJobData {
   newsletterId: string;
+  userId: string;
 }
 
 let queue: Queue<NewsletterGenerateJobData> | null = null;

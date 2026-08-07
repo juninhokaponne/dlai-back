@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 
 export function createDbMock() {
-  return {
+  const db: any = {
     select: jest.fn().mockReturnThis(),
     from: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
@@ -13,5 +13,7 @@ export function createDbMock() {
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
     delete: jest.fn().mockReturnThis(),
+    transaction: jest.fn((callback: (tx: any) => unknown) => callback(db)),
   };
+  return db;
 }

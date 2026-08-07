@@ -11,6 +11,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -21,6 +22,8 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   isEmailVerified: boolean("is_email_verified").default(false).notNull(),
+  creditBalance: integer("credit_balance").default(TRIAL_CREDITS).notNull(),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -113,3 +116,38 @@ export const contactsRelations = relations(contacts, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const creditTransactionReason = pgEnum("credit_transaction_reason", [
+  "trial_grant",
+  "subscription_grant",
+  "generation_debit",
+  "generation_refund",
+  "manual_adjustment",
+]);
+
+export const creditTransactions = pgTable("credit_transactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  amount: integer("amount").notNull(),
+  reason: creditTransactionReason("reason").notNull(),
+  newsletterId: uuid("newsletter_id").references(() => newsletters.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const creditTransactionsRelations = relations(
+  creditTransactions,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [creditTransactions.userId],
+      references: [users.id],
+    }),
+    newsletter: one(newsletters, {
+      fields: [creditTransactions.newsletterId],
+      references: [newsletters.id],
+    }),
+  }),
+);

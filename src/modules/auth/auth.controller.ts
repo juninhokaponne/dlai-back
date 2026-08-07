@@ -1,8 +1,13 @@
 import type { NextFunction, Request, Response } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
-import { refreshTokens, users } from "../../database/schema/schema.js";
+import {
+  refreshTokens,
+  users,
+  creditTransactions,
+} from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
+import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
 import {
   generateAccessToken,
   generateRefreshTokenRaw,
@@ -38,10 +43,20 @@ export class AuthController {
 
       const passwordHash = await hashPassword(password);
 
-      const [newUser] = await db
-        .insert(users)
-        .values({ name, lastName, age, company, email, passwordHash })
-        .returning();
+      const newUser = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(users)
+          .values({ name, lastName, age, company, email, passwordHash })
+          .returning();
+
+        await tx.insert(creditTransactions).values({
+          userId: created!.id,
+          amount: TRIAL_CREDITS,
+          reason: "trial_grant",
+        });
+
+        return created;
+      });
 
       return res.status(201).json({
         message: "User created successfully!",
@@ -49,6 +64,7 @@ export class AuthController {
           id: newUser?.id,
           name: newUser?.name,
           email: newUser?.email,
+          creditBalance: newUser?.creditBalance,
         },
       });
     } catch (err) {
@@ -195,6 +211,7 @@ export class AuthController {
           email: users.email,
           company: users.company,
           isEmailVerified: users.isEmailVerified,
+          creditBalance: users.creditBalance,
           createdAt: users.createdAt,
         })
         .from(users)
