@@ -75,12 +75,9 @@ export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobDat
       })
       .where(eq(newsletters.id, job.data.newsletterId));
 
-    await creditCredits(
-      job.data.userId,
-      GENERATION_CREDIT_COST,
-      "generation_refund",
-      job.data.newsletterId,
-    );
+    await creditCredits(job.data.userId, GENERATION_CREDIT_COST, "generation_refund", {
+      newsletterId: job.data.newsletterId,
+    });
   });
 
   return worker;

@@ -41,7 +41,7 @@ export async function creditCredits(
   userId: string,
   amount: number,
   reason: CreditReason,
-  newsletterId?: string,
+  options: { newsletterId?: string; stripeEventId?: string } = {},
 ): Promise<number> {
   return db.transaction(async (tx) => {
     const [updated] = await tx
@@ -54,7 +54,8 @@ export async function creditCredits(
       userId,
       amount,
       reason,
-      ...(newsletterId ? { newsletterId } : {}),
+      ...(options.newsletterId ? { newsletterId: options.newsletterId } : {}),
+      ...(options.stripeEventId ? { stripeEventId: options.stripeEventId } : {}),
     });
 
     return updated!.creditBalance;

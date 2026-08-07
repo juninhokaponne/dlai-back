@@ -36,6 +36,20 @@
       "when": 1786139657227,
       "tag": "0004_daily_wendell_rand",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786140346517,
+      "tag": "0005_volatile_stryfe",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786141195133,
+      "tag": "0006_greedy_agent_zero",
+      "breakpoints": true
     }
   ]
 }

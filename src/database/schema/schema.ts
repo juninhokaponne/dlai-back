@@ -135,6 +135,7 @@ export const creditTransactions = pgTable("credit_transactions", {
   newsletterId: uuid("newsletter_id").references(() => newsletters.id, {
     onDelete: "set null",
   }),
+  stripeEventId: varchar("stripe_event_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -151,3 +152,46 @@ export const creditTransactionsRelations = relations(
     }),
   }),
 );
+
+export const subscriptionStatus = pgEnum("subscription_status", [
+  "active",
+  "past_due",
+  "canceled",
+  "incomplete",
+  "incomplete_expired",
+  "trialing",
+  "unpaid",
+  "paused",
+]);
+
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull()
+    .unique(),
+  plan: varchar("plan", { length: 50 }).notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", {
+    length: 255,
+  })
+    .notNull()
+    .unique(),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull(),
+  status: subscriptionStatus("status").notNull(),
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const stripeEvents = pgTable("stripe_events", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  type: varchar("type", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
