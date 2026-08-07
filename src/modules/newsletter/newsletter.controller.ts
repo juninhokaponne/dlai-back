@@ -1,5 +1,5 @@
-import type { AIProvider } from "./ai.interface.js";
+import type { AIService } from "../../shared/ai/ai.service.js";
 
 export class NewsletterController {
-  constructor(_provider: AIProvider) {}
+  constructor(_aiService: AIService) {}
 }
