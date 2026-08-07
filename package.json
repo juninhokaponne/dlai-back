@@ -11,7 +11,8 @@
     "dev": "nodemon --exec tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "docker:migrate": "docker compose --profile tools run --build --rm migrate"
+    "docker:migrate": "docker compose --profile tools run --build --rm migrate",
+    "stripe:setup-plans": "tsx scripts/setup-stripe-plans.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
@@ -33,6 +34,7 @@
     "pg": "^8.22.0",
     "postgres": "^3.4.9",
     "resend": "^6.18.1",
+    "stripe": "^22.4.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
