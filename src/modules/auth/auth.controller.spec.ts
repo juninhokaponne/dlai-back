@@ -11,8 +11,10 @@ jest.unstable_mockModule("../../shared/utils/security.js", () => ({
   hashPassword: jest.fn(),
   verifyPassword: jest.fn(),
   generateAccessToken: jest.fn(),
+  verifyAccessToken: jest.fn(),
   generateRefreshTokenRaw: jest.fn(),
   hashToken: jest.fn(),
+  refreshTokenExpiry: jest.fn(),
 }));
 
 const { AuthController } = await import("./auth.controller.js");
@@ -22,10 +24,12 @@ describe("AuthController.register", () => {
   let controller: InstanceType<typeof AuthController>;
   let req: any;
   let res: any;
+  let next: jest.Mock;
 
   beforeEach(() => {
     controller = new AuthController();
     res = mockResponse();
+    next = jest.fn();
   });
 
   it("Should return 409 if email already exists", async () => {
@@ -40,26 +44,25 @@ describe("AuthController.register", () => {
       { id: "1", email: "existe@teste.com" },
     ]);
 
-    await controller.register(req, res);
+    await controller.register(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ error: "User already exists." });
   });
 
-  it("Should return 409 if required fields are missing", async () => {
+  it("Should forward unexpected errors to next()", async () => {
     req = mockRequest({
-      body: {
-        email: "",
-        name: "",
-        password: "",
-      },
+      body: { email: "x@teste.com", name: "X", password: "12345678" },
     });
 
-    await controller.register(req, res);
+    (db.select as jest.Mock).mockReturnThis();
+    (db.from as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.limit as jest.Mock).mockRejectedValue(new Error("db down"));
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      error: "All fields are required.",
-    });
+    await controller.register(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(res.status).not.toHaveBeenCalled();
   });
 });
