@@ -15,7 +15,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/dlai-back
+            cd /home/main/dlai-back
             git pull origin main
             docker compose pull
             docker compose up -d --build
