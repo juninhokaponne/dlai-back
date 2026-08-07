@@ -1,0 +1,1 @@
+ALTER TABLE "newsletters" ADD COLUMN "last_error_message" text;

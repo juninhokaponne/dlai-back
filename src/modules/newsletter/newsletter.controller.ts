@@ -4,13 +4,21 @@ import { z } from "zod";
 import { db } from "../../database/index.js";
 import { newsletters } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
-import type { AIService } from "../../shared/ai/ai.service.js";
+import { getNewsletterGenerateQueue } from "../../queue/newsletter-generate.queue.js";
 
 const idParamSchema = z.string().uuid();
 
-export class NewsletterController {
-  constructor(_aiService: AIService) {}
+async function findOwnedNewsletter(id: string, userId: string) {
+  const [newsletter] = await db
+    .select()
+    .from(newsletters)
+    .where(and(eq(newsletters.id, id), eq(newsletters.userId, userId)))
+    .limit(1);
 
+  return newsletter;
+}
+
+export class NewsletterController {
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const rows = await db
@@ -47,17 +55,10 @@ export class NewsletterController {
         return res.status(400).json({ error: "Invalid newsletter id." });
       }
 
-      const [newsletter] = await db
-        .select()
-        .from(newsletters)
-        .where(
-          and(
-            eq(newsletters.id, parsedId.data),
-            eq(newsletters.userId, req.user!.userId),
-          ),
-        )
-        .limit(1);
-
+      const newsletter = await findOwnedNewsletter(
+        parsedId.data,
+        req.user!.userId,
+      );
       if (!newsletter) {
         return res.status(404).json({ error: "Newsletter not found." });
       }
@@ -96,6 +97,43 @@ export class NewsletterController {
       }
 
       return res.json({ newsletter });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async generate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedId = idParamSchema.safeParse(req.params.id);
+      if (!parsedId.success) {
+        return res.status(400).json({ error: "Invalid newsletter id." });
+      }
+
+      const newsletter = await findOwnedNewsletter(
+        parsedId.data,
+        req.user!.userId,
+      );
+      if (!newsletter) {
+        return res.status(404).json({ error: "Newsletter not found." });
+      }
+
+      if (newsletter.status === "generating") {
+        return res
+          .status(409)
+          .json({ error: "Generation already in progress for this newsletter." });
+      }
+
+      const [updated] = await db
+        .update(newsletters)
+        .set({ status: "generating", updatedAt: new Date() })
+        .where(eq(newsletters.id, newsletter.id))
+        .returning();
+
+      await getNewsletterGenerateQueue().add("generate", {
+        newsletterId: newsletter.id,
+      });
+
+      return res.status(202).json({ newsletter: updated });
     } catch (err) {
       next(err);
     }

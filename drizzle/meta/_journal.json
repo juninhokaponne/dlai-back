@@ -15,6 +15,13 @@
       "when": 1786132666283,
       "tag": "0001_lowly_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786133236158,
+      "tag": "0002_last_mattie_franklin",
+      "breakpoints": true
     }
   ]
 }

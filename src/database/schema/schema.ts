@@ -70,6 +70,7 @@ export const newsletters = pgTable("newsletters", {
   })
     .default("0")
     .notNull(),
+  lastErrorMessage: text("last_error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   sentAt: timestamp("sent_at"),
