@@ -34,6 +34,6 @@
     // Perfomance
     "incremental": true
   },
-  "include": ["src/**/*.ts", "drizzle.config.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "src/tests", "**/*.spec.ts", "**/*.test.ts"]
 }
