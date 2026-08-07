@@ -8,6 +8,7 @@ import {
   boolean,
   timestamp,
   pgEnum,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -79,6 +80,36 @@ export const newsletters = pgTable("newsletters", {
 export const newslettersRelations = relations(newsletters, ({ one }) => ({
   user: one(users, {
     fields: [newsletters.userId],
+    references: [users.id],
+  }),
+}));
+
+export const contactStatus = pgEnum("contact_status", [
+  "subscribed",
+  "unsubscribed",
+  "bounced",
+  "complained",
+  "suppressed",
+]);
+
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    name: varchar("name", { length: 255 }),
+    status: contactStatus("status").default("subscribed").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [unique("contacts_user_id_email_unique").on(table.userId, table.email)],
+);
+
+export const contactsRelations = relations(contacts, ({ one }) => ({
+  user: one(users, {
+    fields: [contacts.userId],
     references: [users.id],
   }),
 }));

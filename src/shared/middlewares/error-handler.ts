@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { MulterError } from "multer";
 
 export function errorHandler(
   err: any,
@@ -8,7 +9,7 @@ export function errorHandler(
 ) {
   console.error(err);
 
-  const status = err.statusCode ?? 500;
+  const status = err instanceof MulterError ? 400 : (err.statusCode ?? 500);
   const message =
     process.env.NODE_ENV === "production" && status === 500
       ? "Internal server error"
