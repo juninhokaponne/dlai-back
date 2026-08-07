@@ -1,6 +1,7 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import { createDbMock } from "../../tests/helpes/db-mock.js";
 import { mockRequest, mockResponse } from "../../tests/helpes/express-mock.js";
+import { register } from "node:module";
 
 jest.unstable_mockModule("../../database/index.js", () => ({
   db: createDbMock(),
@@ -43,5 +44,22 @@ describe("AuthController.register", () => {
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ error: "User already exists." });
+  });
+
+  it("Should return 409 if required fields are missing", async () => {
+    req = mockRequest({
+      body: {
+        email: "",
+        name: "",
+        password: "",
+      },
+    });
+
+    await controller.register(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "All fields are required.",
+    });
   });
 });
