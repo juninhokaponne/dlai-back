@@ -58,6 +58,11 @@ export class AuthController {
         return created;
       });
 
+      // No auth middleware runs on this route (the user doesn't exist yet
+      // when the request starts), so attach the identity we just created
+      // for the request-completion log line to pick up.
+      (req as AuthenticatedRequest).user = { userId: newUser!.id, email: newUser!.email };
+
       return res.status(201).json({
         message: "User created successfully!",
         user: {
@@ -112,6 +117,10 @@ export class AuthController {
         expires: expiresAt,
       });
 
+      // Same reasoning as register(): requireAuth never runs on this route,
+      // so attach the identity for the request-completion log line.
+      (req as AuthenticatedRequest).user = { userId: user.id, email: user.email };
+
       return res.json({
         accessToken,
         user: { id: user.id, name: user.name, email: user.email },
@@ -153,6 +162,10 @@ export class AuthController {
       if (!user) {
         return res.status(401).json({ error: "Invalid refresh token." });
       }
+
+      // Same reasoning as register()/login(): requireAuth never runs on
+      // this route, so attach the identity for the request-completion log.
+      (req as AuthenticatedRequest).user = { userId: user.id, email: user.email };
 
       await db
         .update(refreshTokens)

@@ -29,7 +29,7 @@ ${content}
 }
 
 async function processJob(job: Job<NewsletterSendJobData>) {
-  const { newsletterId } = job.data;
+  const { newsletterId, userId } = job.data;
 
   const [newsletter] = await db
     .select()
@@ -68,7 +68,7 @@ async function processJob(job: Job<NewsletterSendJobData>) {
     } catch (err) {
       failed++;
       logger.error(
-        { err, newsletterId, contactEmail: contact.email },
+        { err, newsletterId, userId, contactEmail: contact.email },
         "Failed to send newsletter to contact",
       );
     }
@@ -79,7 +79,7 @@ async function processJob(job: Job<NewsletterSendJobData>) {
     .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
     .where(eq(newsletters.id, newsletterId));
 
-  logger.info({ newsletterId, sent, failed }, "Newsletter send finished");
+  logger.info({ newsletterId, userId, sent, failed }, "Newsletter send finished");
 }
 
 export function startNewsletterSendWorker(): Worker<NewsletterSendJobData> {
@@ -92,7 +92,7 @@ export function startNewsletterSendWorker(): Worker<NewsletterSendJobData> {
   worker.on("failed", async (job, err) => {
     if (!job) return;
     logger.error(
-      { err, newsletterId: job.data.newsletterId },
+      { err, newsletterId: job.data.newsletterId, userId: job.data.userId },
       "Newsletter send job failed",
     );
     await db

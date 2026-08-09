@@ -11,6 +11,7 @@ import { ratelimit } from "./shared/middlewares/rate-limit.js";
 import { handleStripeWebhook } from "./modules/billing/billing.webhook.js";
 import { rootLogger } from "./shared/logger/logger.js";
 import { buildOpenApiDocument } from "./shared/openapi/document.js";
+import type { AuthenticatedRequest } from "./shared/middlewares/auth.js";
 export const app = express();
 
 // In production the app sits behind exactly one reverse proxy (Caddy on the
@@ -33,11 +34,17 @@ app.use(
     logger: rootLogger,
     // Keep request logs to the essentials — the default serializers dump
     // every header (including Authorization/Cookie), which both leaks
-    // credentials into logs and is mostly noise.
+    // credentials into logs and is mostly noise. `id` is pino-http's
+    // auto-generated per-request correlation id (reqId); userId is filled
+    // in once requireAuth resolves the request (undefined for public
+    // routes) so a user's activity can be filtered across requests.
     serializers: {
-      req: (req) => ({ method: req.method, url: req.url }),
+      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
       res: (res) => ({ statusCode: res.statusCode }),
     },
+    customProps: (req) => ({
+      userId: (req as AuthenticatedRequest).user?.userId,
+    }),
   }),
 );
 

@@ -17,7 +17,7 @@ const logger = createLogger("newsletter-generate.worker");
 const aiService = new AIService(new OpenRouterProvider());
 
 async function processJob(job: Job<NewsletterGenerateJobData>) {
-  const { newsletterId } = job.data;
+  const { newsletterId, userId } = job.data;
 
   const [newsletter] = await db
     .select()
@@ -55,7 +55,7 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
     })
     .where(eq(newsletters.id, newsletterId));
 
-  logger.info({ newsletterId, costUsd: totalCost }, "Newsletter generated");
+  logger.info({ newsletterId, userId, costUsd: totalCost }, "Newsletter generated");
 }
 
 export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobData> {
@@ -71,7 +71,7 @@ export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobDat
     if (!exhausted) return;
 
     logger.error(
-      { err, newsletterId: job.data.newsletterId },
+      { err, newsletterId: job.data.newsletterId, userId: job.data.userId },
       "Newsletter generation failed",
     );
 
