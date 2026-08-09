@@ -2,6 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import swaggerUi from "swagger-ui-express";
 import { pinoHttp } from "pino-http";
 import { router } from "./routes/index.js";
 import { errorHandler } from "./shared/middlewares/error-handler.js";
@@ -9,6 +10,7 @@ import { notFound } from "./shared/middlewares/not-found.js";
 import { ratelimit } from "./shared/middlewares/rate-limit.js";
 import { handleStripeWebhook } from "./modules/billing/billing.webhook.js";
 import { rootLogger } from "./shared/logger/logger.js";
+import { buildOpenApiDocument } from "./shared/openapi/document.js";
 export const app = express();
 
 // In production the app sits behind exactly one reverse proxy (Caddy on the
@@ -17,6 +19,12 @@ export const app = express();
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
+
+// Mounted before helmet() so the strict API CSP (script-src 'self', no
+// inline) doesn't break Swagger UI's bundled inline script.
+const openApiDocument = buildOpenApiDocument();
+app.get("/docs/openapi.json", (_req, res) => res.json(openApiDocument));
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
 app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(",") ?? [] }));

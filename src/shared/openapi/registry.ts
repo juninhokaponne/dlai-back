@@ -1,0 +1,277 @@
+import { extendZodWithOpenApi, OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
+import { z } from "zod";
+import { loginSchema, registerSchema } from "../../modules/auth/auth.schema.js";
+import {
+  createNewsletterSchema,
+  updateNewsletterSchema,
+} from "../../modules/newsletter/newsletter.schema.js";
+import { checkoutSchema } from "../../modules/billing/billing.schema.js";
+
+extendZodWithOpenApi(z);
+
+export const registry = new OpenAPIRegistry();
+
+registry.registerComponent("securitySchemes", "bearerAuth", {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "JWT",
+});
+
+const bearerAuth = [{ bearerAuth: [] }];
+
+const errorResponse = (description: string) => ({
+  description,
+  content: { "application/json": { schema: z.object({ error: z.string() }) } },
+});
+
+const uuidParam = z.object({
+  id: z.string().uuid().openapi({ description: "Newsletter id" }),
+});
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/register",
+  tags: ["Auth"],
+  summary: "Cria uma nova conta",
+  request: { body: { content: { "application/json": { schema: registerSchema } } } },
+  responses: {
+    201: {
+      description: "Usuario criado, com credito de trial",
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+            user: z.object({
+              id: z.string(),
+              name: z.string(),
+              email: z.string(),
+              creditBalance: z.number(),
+            }),
+          }),
+        },
+      },
+    },
+    409: errorResponse("Email ja cadastrado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/login",
+  tags: ["Auth"],
+  summary: "Login (retorna access token e seta cookie de refresh)",
+  request: { body: { content: { "application/json": { schema: loginSchema } } } },
+  responses: {
+    200: {
+      description: "Login bem sucedido",
+      content: {
+        "application/json": {
+          schema: z.object({ accessToken: z.string(), user: z.object({}) }),
+        },
+      },
+    },
+    401: errorResponse("Credenciais invalidas"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/refresh",
+  tags: ["Auth"],
+  summary: "Renova o access token usando o cookie de refresh",
+  responses: {
+    200: {
+      description: "Novo access token",
+      content: { "application/json": { schema: z.object({ accessToken: z.string() }) } },
+    },
+    401: errorResponse("Refresh token ausente, invalido ou expirado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/logout",
+  tags: ["Auth"],
+  summary: "Revoga o refresh token e limpa o cookie",
+  responses: { 204: { description: "Logout efetuado" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/auth/me",
+  tags: ["Auth"],
+  summary: "Perfil do usuario autenticado",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Dados do usuario", content: { "application/json": { schema: z.object({ user: z.object({}) } ) } } },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Newsletters
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/newsletters",
+  tags: ["Newsletters"],
+  summary: "Lista as newsletters do usuario",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Lista de newsletters", content: { "application/json": { schema: z.object({ newsletters: z.array(z.object({})) }) } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/newsletters",
+  tags: ["Newsletters"],
+  summary: "Cria uma newsletter (rascunho, ainda sem conteudo)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: createNewsletterSchema } } } },
+  responses: { 201: { description: "Newsletter criada", content: { "application/json": { schema: z.object({ newsletter: z.object({}) }) } } } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/newsletters/{id}",
+  tags: ["Newsletters"],
+  summary: "Busca uma newsletter por id",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    200: { description: "Newsletter encontrada", content: { "application/json": { schema: z.object({ newsletter: z.object({}) }) } } },
+    400: errorResponse("Id invalido"),
+    404: errorResponse("Newsletter nao encontrada"),
+  },
+});
+
+registry.registerPath({
+  method: "put",
+  path: "/api/newsletters/{id}",
+  tags: ["Newsletters"],
+  summary: "Edita topic/title/content manualmente",
+  security: bearerAuth,
+  request: {
+    params: uuidParam,
+    body: { content: { "application/json": { schema: updateNewsletterSchema } } },
+  },
+  responses: {
+    200: { description: "Newsletter atualizada", content: { "application/json": { schema: z.object({ newsletter: z.object({}) }) } } },
+    400: errorResponse("Id invalido ou nenhum campo enviado"),
+    404: errorResponse("Newsletter nao encontrada"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/newsletters/{id}/generate",
+  tags: ["Newsletters"],
+  summary: "Gera titulo e corpo via IA (assincrono, debita 1 credito)",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    202: { description: "Geracao enfileirada", content: { "application/json": { schema: z.object({ newsletter: z.object({}), creditBalance: z.number() }) } } },
+    400: errorResponse("Sem creditos suficientes"),
+    404: errorResponse("Newsletter nao encontrada"),
+    409: errorResponse("Geracao ja em andamento"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/newsletters/{id}/send",
+  tags: ["Newsletters"],
+  summary: "Envia a newsletter pronta para os contacts subscribed",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    202: { description: "Envio enfileirado", content: { "application/json": { schema: z.object({ newsletter: z.object({}), recipientCount: z.number() }) } } },
+    400: errorResponse("Sem contacts subscribed ou newsletter nao esta pronta"),
+    404: errorResponse("Newsletter nao encontrada"),
+    409: errorResponse("Envio ja em andamento"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Contacts
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/contacts",
+  tags: ["Contacts"],
+  summary: "Lista os contacts do usuario",
+  security: bearerAuth,
+  request: {
+    query: z.object({
+      limit: z.string().optional().openapi({ description: "Padrao 100, maximo 500" }),
+      offset: z.string().optional(),
+    }),
+  },
+  responses: { 200: { description: "Lista de contacts", content: { "application/json": { schema: z.object({ contacts: z.array(z.object({})) }) } } } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/contacts/import",
+  tags: ["Contacts"],
+  summary: "Importa contacts via upload de CSV (colunas: email, name)",
+  security: bearerAuth,
+  request: {
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.object({ file: z.string().openapi({ type: "string", format: "binary" }) }),
+        },
+      },
+    },
+  },
+  responses: {
+    201: { description: "Import processado", content: { "application/json": { schema: z.object({ imported: z.number(), skippedDuplicates: z.number(), invalidCount: z.number() }) } } },
+    400: errorResponse("CSV ausente/invalido"),
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/contacts/unsubscribe/{token}",
+  tags: ["Contacts"],
+  summary: "Link publico de descadastro (clicado a partir do email)",
+  request: { params: z.object({ token: z.string().uuid() }) },
+  responses: {
+    200: { description: "Descadastrado com sucesso (HTML)" },
+    400: { description: "Token invalido (HTML)" },
+    404: { description: "Contato nao encontrado (HTML)" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Billing
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/billing/plans",
+  tags: ["Billing"],
+  summary: "Lista os planos disponiveis",
+  responses: { 200: { description: "Planos", content: { "application/json": { schema: z.object({ plans: z.array(z.object({})) }) } } } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/billing/checkout",
+  tags: ["Billing"],
+  summary: "Cria uma sessao de checkout do Stripe para assinar um plano",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: checkoutSchema } } } },
+  responses: {
+    201: { description: "URL de checkout", content: { "application/json": { schema: z.object({ url: z.string() }) } } },
+    500: errorResponse("Plano ainda nao configurado no Stripe"),
+  },
+});
