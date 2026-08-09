@@ -1,7 +1,7 @@
-import type { NextFunction, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { parse } from "csv-parse/sync";
 import { desc, eq } from "drizzle-orm";
-import type { z } from "zod";
+import { z } from "zod";
 import { db } from "../../database/index.js";
 import { contacts } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
@@ -108,6 +108,33 @@ export class ContactsController {
         invalidCount,
         invalidSamples,
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async unsubscribe(req: Request, res: Response, next: NextFunction) {
+    try {
+      const parsedToken = z.string().uuid().safeParse(req.params.token);
+      if (!parsedToken.success) {
+        return res.status(400).send("<p>Link invalido.</p>");
+      }
+
+      const [contact] = await db
+        .update(contacts)
+        .set({ status: "unsubscribed" })
+        .where(eq(contacts.unsubscribeToken, parsedToken.data))
+        .returning({ id: contacts.id });
+
+      if (!contact) {
+        return res.status(404).send("<p>Contato nao encontrado.</p>");
+      }
+
+      return res
+        .status(200)
+        .send(
+          "<p>Voce foi descadastrado com sucesso e nao vai mais receber emails desta lista.</p>",
+        );
     } catch (err) {
       next(err);
     }

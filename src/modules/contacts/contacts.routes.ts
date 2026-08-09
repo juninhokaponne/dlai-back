@@ -11,6 +11,8 @@ const upload = multer({
 const router = Router();
 const controller = new ContactsController();
 
+router.get("/unsubscribe/:token", controller.unsubscribe);
+
 router.use(requireAuth);
 
 router.get("/", controller.list);

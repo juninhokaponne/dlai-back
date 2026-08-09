@@ -105,6 +105,7 @@ export const contacts = pgTable(
     email: varchar("email", { length: 255 }).notNull(),
     name: varchar("name", { length: 255 }),
     status: contactStatus("status").default("subscribed").notNull(),
+    unsubscribeToken: uuid("unsubscribe_token").defaultRandom().notNull().unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [unique("contacts_user_id_email_unique").on(table.userId, table.email)],

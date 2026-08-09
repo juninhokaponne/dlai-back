@@ -50,6 +50,13 @@
       "when": 1786141195133,
       "tag": "0006_greedy_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786307911818,
+      "tag": "0007_safe_power_pack",
+      "breakpoints": true
     }
   ]
 }

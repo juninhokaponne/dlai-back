@@ -1,0 +1,2 @@
+ALTER TABLE "contacts" ADD COLUMN "unsubscribe_token" uuid DEFAULT gen_random_uuid() NOT NULL;--> statement-breakpoint
+ALTER TABLE "contacts" ADD CONSTRAINT "contacts_unsubscribe_token_unique" UNIQUE("unsubscribe_token");

@@ -14,5 +14,6 @@ router.post("/", validate(createNewsletterSchema), controller.create);
 router.get("/:id", controller.get);
 router.put("/:id", validate(updateNewsletterSchema), controller.update);
 router.post("/:id/generate", controller.generate);
+router.post("/:id/send", controller.send);
 
 export { router as newsletterRoutes };
