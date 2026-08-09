@@ -9,6 +9,13 @@ import { ratelimit } from "./shared/middlewares/rate-limit.js";
 import { handleStripeWebhook } from "./modules/billing/billing.webhook.js";
 export const app = express();
 
+// In production the app sits behind exactly one reverse proxy (Caddy on the
+// same host), so we trust one hop of X-Forwarded-For for correct client IPs
+// (req.ip, rate limiting, secure cookies).
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(",") ?? [] }));
 
