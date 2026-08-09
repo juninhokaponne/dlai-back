@@ -6,6 +6,7 @@ import {
   updateNewsletterSchema,
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
+import { workspaceGenerateSchema } from "../../modules/workspace/workspace.schema.js";
 
 extendZodWithOpenApi(z);
 
@@ -273,5 +274,56 @@ registry.registerPath({
   responses: {
     201: { description: "URL de checkout", content: { "application/json": { schema: z.object({ url: z.string() }) } } },
     500: errorResponse("Plano ainda nao configurado no Stripe"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Workspace
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/workspace/overview",
+  tags: ["Workspace"],
+  summary: "Resumo da conta: creditos, newsletters por status, contacts, recentes",
+  security: bearerAuth,
+  responses: {
+    200: {
+      description: "Resumo da conta",
+      content: {
+        "application/json": {
+          schema: z.object({
+            creditBalance: z.number(),
+            newslettersByStatus: z.object({}),
+            subscribedContacts: z.number(),
+            recentNewsletters: z.array(z.object({})),
+          }),
+        },
+      },
+    },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/workspace/ai-suggestions",
+  tags: ["Workspace"],
+  summary: "Sugestoes de temas de newsletter via IA, baseadas no historico do usuario",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Lista de sugestoes", content: { "application/json": { schema: z.object({ suggestions: z.array(z.string()) }) } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/workspace/generate",
+  tags: ["Workspace"],
+  summary: "Atalho: cria a newsletter e ja dispara a geracao num passo so",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: workspaceGenerateSchema } } } },
+  responses: {
+    202: { description: "Geracao enfileirada", content: { "application/json": { schema: z.object({ newsletter: z.object({}), creditBalance: z.number() }) } } },
+    400: errorResponse("Sem creditos suficientes"),
   },
 });

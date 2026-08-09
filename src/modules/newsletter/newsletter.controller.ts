@@ -4,11 +4,9 @@ import { z } from "zod";
 import { db } from "../../database/index.js";
 import { newsletters } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
-import { getNewsletterGenerateQueue } from "../../queue/newsletter-generate.queue.js";
 import { getNewsletterSendQueue } from "../../queue/newsletter-send.queue.js";
-import { debitCredits } from "../../shared/billing/credits.service.js";
-import { GENERATION_CREDIT_COST } from "../../shared/billing/credits.config.js";
 import { contacts } from "../../database/schema/schema.js";
+import { createNewsletter, startNewsletterGeneration } from "./newsletter.service.js";
 
 const idParamSchema = z.string().uuid();
 
@@ -40,12 +38,7 @@ export class NewsletterController {
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { topic } = req.body;
-
-      const [newsletter] = await db
-        .insert(newsletters)
-        .values({ userId: req.user!.userId, topic })
-        .returning();
-
+      const newsletter = await createNewsletter(req.user!.userId, topic);
       return res.status(201).json({ newsletter });
     } catch (err) {
       next(err);
@@ -127,27 +120,12 @@ export class NewsletterController {
           .json({ error: "Generation already in progress for this newsletter." });
       }
 
-      const remainingCredits = await debitCredits(
-        req.user!.userId,
-        GENERATION_CREDIT_COST,
-        "generation_debit",
+      const { newsletter: updated, creditBalance } = await startNewsletterGeneration(
         newsletter.id,
+        req.user!.userId,
       );
 
-      const [updated] = await db
-        .update(newsletters)
-        .set({ status: "generating", updatedAt: new Date() })
-        .where(eq(newsletters.id, newsletter.id))
-        .returning();
-
-      await getNewsletterGenerateQueue().add("generate", {
-        newsletterId: newsletter.id,
-        userId: req.user!.userId,
-      });
-
-      return res
-        .status(202)
-        .json({ newsletter: updated, creditBalance: remainingCredits });
+      return res.status(202).json({ newsletter: updated, creditBalance });
     } catch (err) {
       next(err);
     }
