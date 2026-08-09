@@ -2,6 +2,8 @@ import { Router } from "express";
 import multer from "multer";
 import { ContactsController } from "./contacts.controller.js";
 import { requireAuth } from "../../shared/middlewares/auth.js";
+import { validate } from "../../shared/middlewares/validate.js";
+import { contactRowSchema } from "./contact.schema.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -16,6 +18,7 @@ router.get("/unsubscribe/:token", controller.unsubscribe);
 router.use(requireAuth);
 
 router.get("/", controller.list);
+router.post("/", validate(contactRowSchema), controller.create);
 router.post("/import", upload.single("file"), controller.import);
 
 export { router as contactsRoutes };

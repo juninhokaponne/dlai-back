@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { parse } from "csv-parse/sync";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
 import { contacts } from "../../database/schema/schema.js";
@@ -25,6 +25,35 @@ export class ContactsController {
         .offset(offset);
 
       return res.json({ contacts: rows });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { email, name } = req.body;
+
+      const [existing] = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.userId, req.user!.userId), eq(contacts.email, email)))
+        .limit(1);
+
+      if (existing) {
+        return res.status(409).json({ error: "Contact already exists." });
+      }
+
+      const [contact] = await db
+        .insert(contacts)
+        .values({
+          userId: req.user!.userId,
+          email,
+          ...(name !== undefined ? { name } : {}),
+        })
+        .returning();
+
+      return res.status(201).json({ contact });
     } catch (err) {
       next(err);
     }

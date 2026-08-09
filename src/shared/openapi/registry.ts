@@ -7,6 +7,7 @@ import {
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
 import { workspaceGenerateSchema } from "../../modules/workspace/workspace.schema.js";
+import { contactRowSchema } from "../../modules/contacts/contact.schema.js";
 
 extendZodWithOpenApi(z);
 
@@ -216,6 +217,19 @@ registry.registerPath({
     }),
   },
   responses: { 200: { description: "Lista de contacts", content: { "application/json": { schema: z.object({ contacts: z.array(z.object({})) }) } } } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/contacts",
+  tags: ["Contacts"],
+  summary: "Adiciona um contact manualmente",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: contactRowSchema } } } },
+  responses: {
+    201: { description: "Contact criado", content: { "application/json": { schema: z.object({ contact: z.object({}) }) } } },
+    409: errorResponse("Contact ja existe"),
+  },
 });
 
 registry.registerPath({
