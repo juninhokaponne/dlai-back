@@ -57,6 +57,13 @@
       "when": 1786307911818,
       "tag": "0007_safe_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786315121944,
+      "tag": "0008_bumpy_shiver_man",
+      "breakpoints": true
     }
   ]
 }
