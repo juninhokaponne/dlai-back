@@ -1,5 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { MulterError } from "multer";
+import { createLogger } from "../logger/logger.js";
+
+const logger = createLogger("error-handler");
 
 export function errorHandler(
   err: any,
@@ -7,7 +10,7 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ) {
-  console.error(err);
+  logger.error({ err }, "Request failed");
 
   const status = err instanceof MulterError ? 400 : (err.statusCode ?? 500);
   const message =

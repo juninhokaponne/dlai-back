@@ -7,6 +7,9 @@ import { getStripeClient } from "../../shared/billing/stripe-client.js";
 import { creditCredits } from "../../shared/billing/credits.service.js";
 import { PLANS, type PlanKey } from "../../shared/billing/plans.config.js";
 import { subscriptionStatus } from "../../database/schema/schema.js";
+import { createLogger } from "../../shared/logger/logger.js";
+
+const logger = createLogger("billing.webhook");
 
 type SubscriptionStatus = (typeof subscriptionStatus.enumValues)[number];
 
@@ -41,7 +44,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
 
   const userId = await findUserIdByCustomerId(customerId);
   if (!userId) {
-    console.error(`Webhook: no user found for Stripe customer ${customerId}`);
+    logger.error({ customerId }, "No user found for Stripe customer");
     return;
   }
 
@@ -83,7 +86,7 @@ async function grantCreditsForInvoice(invoice: Stripe.Invoice, eventId: string) 
 
   const userId = await findUserIdByCustomerId(customerId);
   if (!userId) {
-    console.error(`Webhook: no user found for Stripe customer ${customerId}`);
+    logger.error({ customerId }, "No user found for Stripe customer");
     return;
   }
 
@@ -91,13 +94,13 @@ async function grantCreditsForInvoice(invoice: Stripe.Invoice, eventId: string) 
   const priceRef = line?.pricing?.price_details?.price;
   const priceId = typeof priceRef === "string" ? priceRef : priceRef?.id;
   if (!priceId) {
-    console.error(`Webhook: invoice ${invoice.id} has no price on its line items.`);
+    logger.error({ invoiceId: invoice.id }, "Invoice has no price on its line items");
     return;
   }
 
   const plan = findPlanByPriceId(priceId);
   if (!plan) {
-    console.error(`Webhook: no matching plan for Stripe price ${priceId}`);
+    logger.error({ priceId }, "No matching plan for Stripe price");
     return;
   }
 
@@ -112,7 +115,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.error("STRIPE_WEBHOOK_SECRET is not set.");
+    logger.error("STRIPE_WEBHOOK_SECRET is not set");
     return res.status(500).send();
   }
   if (!signature) {
@@ -127,7 +130,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       webhookSecret,
     );
   } catch (err) {
-    console.error("Webhook signature verification failed:", (err as Error).message);
+    logger.error({ err }, "Webhook signature verification failed");
     return res.status(400).send(`Webhook Error: ${(err as Error).message}`);
   }
 
@@ -158,9 +161,9 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     }
     return res.status(200).json({ received: true });
   } catch (err) {
-    console.error(
-      `Webhook processing failed for event ${event.id} (${event.type}):`,
-      err,
+    logger.error(
+      { err, eventId: event.id, eventType: event.type },
+      "Webhook processing failed",
     );
     return res.status(500).json({ error: "Processing failed" });
   }

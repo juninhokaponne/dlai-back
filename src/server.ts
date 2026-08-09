@@ -1,22 +1,27 @@
 import http from "node:http";
 import { app } from "./app.js";
 import { startNewsletterGenerateWorker } from "./queue/newsletter-generate.worker.js";
+import { startNewsletterSendWorker } from "./queue/newsletter-send.worker.js";
+import { createLogger } from "./shared/logger/logger.js";
 
 const PORT = Number(process.env.PORT) || 3000;
+const logger = createLogger("server");
 
 export async function startServer() {
   const server = http.createServer(app);
-  const newsletterWorker = startNewsletterGenerateWorker();
+  const newsletterGenerateWorker = startNewsletterGenerateWorker();
+  const newsletterSendWorker = startNewsletterSendWorker();
 
   server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
+    logger.info({ port: PORT }, "Server listening");
   });
 
   const shutdown = (signal: string) => {
-    console.log(`${signal} received, closing server...`);
+    logger.info({ signal }, "Signal received, closing server");
     Promise.all([
       new Promise((resolve) => server.close(resolve)),
-      newsletterWorker.close(),
+      newsletterGenerateWorker.close(),
+      newsletterSendWorker.close(),
     ]).then(() => process.exit(0));
     setTimeout(() => process.exit(1), 10_000).unref();
   };

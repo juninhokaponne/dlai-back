@@ -2,11 +2,13 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { pinoHttp } from "pino-http";
 import { router } from "./routes/index.js";
 import { errorHandler } from "./shared/middlewares/error-handler.js";
 import { notFound } from "./shared/middlewares/not-found.js";
 import { ratelimit } from "./shared/middlewares/rate-limit.js";
 import { handleStripeWebhook } from "./modules/billing/billing.webhook.js";
+import { rootLogger } from "./shared/logger/logger.js";
 export const app = express();
 
 // In production the app sits behind exactly one reverse proxy (Caddy on the
@@ -18,6 +20,18 @@ if (process.env.NODE_ENV === "production") {
 
 app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(",") ?? [] }));
+app.use(
+  pinoHttp({
+    logger: rootLogger,
+    // Keep request logs to the essentials — the default serializers dump
+    // every header (including Authorization/Cookie), which both leaks
+    // credentials into logs and is mostly noise.
+    serializers: {
+      req: (req) => ({ method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode }),
+    },
+  }),
+);
 
 // Stripe needs the raw request body to verify the webhook signature, so this
 // must be registered before the global express.json() body parser below.

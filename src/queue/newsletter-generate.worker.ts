@@ -11,7 +11,9 @@ import {
 } from "./newsletter-generate.queue.js";
 import { creditCredits } from "../shared/billing/credits.service.js";
 import { GENERATION_CREDIT_COST } from "../shared/billing/credits.config.js";
+import { createLogger } from "../shared/logger/logger.js";
 
+const logger = createLogger("newsletter-generate.worker");
 const aiService = new AIService(new OpenRouterProvider());
 
 async function processJob(job: Job<NewsletterGenerateJobData>) {
@@ -52,6 +54,8 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
       updatedAt: new Date(),
     })
     .where(eq(newsletters.id, newsletterId));
+
+  logger.info({ newsletterId, costUsd: totalCost }, "Newsletter generated");
 }
 
 export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobData> {
@@ -65,6 +69,11 @@ export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobDat
     if (!job) return;
     const exhausted = job.attemptsMade >= (job.opts.attempts ?? 1);
     if (!exhausted) return;
+
+    logger.error(
+      { err, newsletterId: job.data.newsletterId },
+      "Newsletter generation failed",
+    );
 
     await db
       .update(newsletters)
