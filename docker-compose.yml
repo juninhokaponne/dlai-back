@@ -16,9 +16,8 @@ services:
     restart: unless-stopped
 
   migrate:
-    build:
-      context: .
-      target: builder
+    image: ghcr.io/juninhokaponne/dlai-back:latest
+    build: .
     env_file: .env
     depends_on:
       - postgres
@@ -26,6 +25,7 @@ services:
     profiles: ["tools"]
 
   app:
+    image: ghcr.io/juninhokaponne/dlai-back:latest
     build: .
     ports:
       - "3000:3000"

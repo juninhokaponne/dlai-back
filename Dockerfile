@@ -18,6 +18,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY drizzle.config.ts ./
+COPY drizzle ./drizzle
 
 EXPOSE 3000
 
