@@ -9,6 +9,7 @@ import { contactRowSchema } from "./contact.schema.js";
 
 const MAX_ROWS = 20_000;
 const MAX_INVALID_SAMPLES = 20;
+const MAX_MANUAL_CONTACTS = 50;
 
 export class ContactsController {
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -33,6 +34,13 @@ export class ContactsController {
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { email, name } = req.body;
+
+      const totalContacts = await db.$count(contacts, eq(contacts.userId, req.user!.userId));
+      if (totalContacts >= MAX_MANUAL_CONTACTS) {
+        return res.status(400).json({
+          error: `Manual contact creation is limited to ${MAX_MANUAL_CONTACTS} contacts. Use CSV import for larger lists.`,
+        });
+      }
 
       const [existing] = await db
         .select({ id: contacts.id })
