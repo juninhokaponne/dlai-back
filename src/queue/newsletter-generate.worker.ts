@@ -10,14 +10,13 @@ import {
   type NewsletterGenerateJobData,
 } from "./newsletter-generate.queue.js";
 import { creditCredits } from "../shared/billing/credits.service.js";
-import { GENERATION_CREDIT_COST } from "../shared/billing/credits.config.js";
 import { createLogger } from "../shared/logger/logger.js";
 
 const logger = createLogger("newsletter-generate.worker");
 const aiService = new AIService(new OpenRouterProvider());
 
 async function processJob(job: Job<NewsletterGenerateJobData>) {
-  const { newsletterId, userId } = job.data;
+  const { newsletterId, userId, bodyModel } = job.data;
 
   const [newsletter] = await db
     .select()
@@ -37,6 +36,7 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
   const body = await aiService.run(
     "body",
     `Gere o corpo de um email de newsletter em HTML simples (sem tags html/head/body, so o conteudo com paragrafos) sobre o tema: "${newsletter.topic}". O titulo da newsletter e: "${title.content}". Seja conciso e envolvente.`,
+    bodyModel,
   );
 
   const totalCost = title.costUsd + body.costUsd;
@@ -84,7 +84,7 @@ export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobDat
       })
       .where(eq(newsletters.id, job.data.newsletterId));
 
-    await creditCredits(job.data.userId, GENERATION_CREDIT_COST, "generation_refund", {
+    await creditCredits(job.data.userId, job.data.creditCost, "generation_refund", {
       newsletterId: job.data.newsletterId,
     });
   });

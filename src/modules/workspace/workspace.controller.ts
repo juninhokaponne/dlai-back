@@ -95,13 +95,14 @@ export class WorkspaceController {
 
   async generate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { topic } = req.body;
+      const { topic, model } = req.body;
       const userId = req.user!.userId;
 
       const newsletter = await createNewsletter(userId, topic);
       const { newsletter: updated, creditBalance } = await startNewsletterGeneration(
         newsletter.id,
         userId,
+        model,
       );
 
       return res.status(202).json({ newsletter: updated, creditBalance });

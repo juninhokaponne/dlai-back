@@ -4,6 +4,7 @@ import { newsletters } from "../../database/schema/schema.js";
 import { getNewsletterGenerateQueue } from "../../queue/newsletter-generate.queue.js";
 import { debitCredits } from "../../shared/billing/credits.service.js";
 import { GENERATION_CREDIT_COST } from "../../shared/billing/credits.config.js";
+import { findBodyModelOption, type BodyModelId } from "../../shared/ai/ai.config.js";
 
 export async function createNewsletter(userId: string, topic: string) {
   const [newsletter] = await db
@@ -14,10 +15,26 @@ export async function createNewsletter(userId: string, topic: string) {
   return newsletter!;
 }
 
-export async function startNewsletterGeneration(newsletterId: string, userId: string) {
+export async function startNewsletterGeneration(
+  newsletterId: string,
+  userId: string,
+  bodyModel?: BodyModelId,
+) {
+  let creditCost = GENERATION_CREDIT_COST;
+
+  if (bodyModel) {
+    const option = findBodyModelOption(bodyModel);
+    if (!option) {
+      throw Object.assign(new Error(`Unknown model "${bodyModel}".`), {
+        statusCode: 400,
+      });
+    }
+    creditCost = option.creditCost;
+  }
+
   const creditBalance = await debitCredits(
     userId,
-    GENERATION_CREDIT_COST,
+    creditCost,
     "generation_debit",
     newsletterId,
   );
@@ -28,7 +45,12 @@ export async function startNewsletterGeneration(newsletterId: string, userId: st
     .where(eq(newsletters.id, newsletterId))
     .returning();
 
-  await getNewsletterGenerateQueue().add("generate", { newsletterId, userId });
+  await getNewsletterGenerateQueue().add("generate", {
+    newsletterId,
+    userId,
+    creditCost,
+    ...(bodyModel ? { bodyModel } : {}),
+  });
 
   return { newsletter: updated!, creditBalance };
 }

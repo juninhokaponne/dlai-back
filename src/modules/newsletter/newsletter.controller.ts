@@ -7,6 +7,7 @@ import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { getNewsletterSendQueue } from "../../queue/newsletter-send.queue.js";
 import { contacts } from "../../database/schema/schema.js";
 import { createNewsletter, startNewsletterGeneration } from "./newsletter.service.js";
+import { BODY_MODEL_OPTIONS } from "../../shared/ai/ai.config.js";
 
 const idParamSchema = z.string().uuid();
 
@@ -21,6 +22,14 @@ async function findOwnedNewsletter(id: string, userId: string) {
 }
 
 export class NewsletterController {
+  async models(_req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      return res.json({ models: BODY_MODEL_OPTIONS });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const rows = await db
@@ -123,6 +132,7 @@ export class NewsletterController {
       const { newsletter: updated, creditBalance } = await startNewsletterGeneration(
         newsletter.id,
         req.user!.userId,
+        req.body?.model,
       );
 
       return res.status(202).json({ newsletter: updated, creditBalance });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { loginSchema, registerSchema } from "../../modules/auth/auth.schema.js";
 import {
   createNewsletterSchema,
+  generateSchema,
   updateNewsletterSchema,
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
@@ -174,14 +175,36 @@ registry.registerPath({
   method: "post",
   path: "/api/newsletters/{id}/generate",
   tags: ["Newsletters"],
-  summary: "Gera titulo e corpo via IA (assincrono, debita 1 credito)",
+  summary: "Gera titulo e corpo via IA (assincrono). Custo em creditos varia por modelo, veja GET /api/newsletters/models",
   security: bearerAuth,
-  request: { params: uuidParam },
+  request: { params: uuidParam, body: { content: { "application/json": { schema: generateSchema } } } },
   responses: {
     202: { description: "Geracao enfileirada", content: { "application/json": { schema: z.object({ newsletter: z.object({}), creditBalance: z.number() }) } } },
-    400: errorResponse("Sem creditos suficientes"),
+    400: errorResponse("Sem creditos suficientes ou modelo invalido"),
     404: errorResponse("Newsletter nao encontrada"),
     409: errorResponse("Geracao ja em andamento"),
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/newsletters/models",
+  tags: ["Newsletters"],
+  summary: "Lista os modelos de IA disponiveis para o corpo da newsletter e seu custo em creditos",
+  security: bearerAuth,
+  responses: {
+    200: {
+      description: "Modelos disponiveis",
+      content: {
+        "application/json": {
+          schema: z.object({
+            models: z.array(
+              z.object({ model: z.string(), label: z.string(), creditCost: z.number() }),
+            ),
+          }),
+        },
+      },
+    },
   },
 });
 
