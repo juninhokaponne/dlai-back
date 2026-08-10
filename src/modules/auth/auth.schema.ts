@@ -42,6 +42,7 @@ export const updateProfileSchema = z.object({
   addressState: z.string().trim().max(255).optional(),
   addressPostalCode: z.string().trim().max(20).optional(),
   addressCountry: z.string().trim().max(255).optional(),
+  newsletterViewMode: z.enum(["list", "grid"]).optional(),
 });
 
 export const changePasswordSchema = z.object({

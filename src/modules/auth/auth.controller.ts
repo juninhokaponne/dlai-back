@@ -37,6 +37,7 @@ const USER_PROFILE_COLUMNS = {
   addressState: users.addressState,
   addressPostalCode: users.addressPostalCode,
   addressCountry: users.addressCountry,
+  newsletterViewMode: users.newsletterViewMode,
   isEmailVerified: users.isEmailVerified,
   creditBalance: users.creditBalance,
   createdAt: users.createdAt,
@@ -269,6 +270,7 @@ export class AuthController {
         addressState,
         addressPostalCode,
         addressCountry,
+        newsletterViewMode,
       } = req.body;
 
       const updates: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
@@ -281,6 +283,7 @@ export class AuthController {
       if (addressState !== undefined) updates.addressState = addressState;
       if (addressPostalCode !== undefined) updates.addressPostalCode = addressPostalCode;
       if (addressCountry !== undefined) updates.addressCountry = addressCountry;
+      if (newsletterViewMode !== undefined) updates.newsletterViewMode = newsletterViewMode;
 
       const [user] = await db
         .update(users)

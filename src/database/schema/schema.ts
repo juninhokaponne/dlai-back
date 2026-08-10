@@ -13,6 +13,8 @@ import {
 import { relations } from "drizzle-orm";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
 
+export const newsletterViewMode = pgEnum("newsletter_view_mode", ["list", "grid"]);
+
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -31,6 +33,7 @@ export const users = pgTable("users", {
   isEmailVerified: boolean("is_email_verified").default(false).notNull(),
   creditBalance: integer("credit_balance").default(TRIAL_CREDITS).notNull(),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
+  newsletterViewMode: newsletterViewMode("newsletter_view_mode").default("list").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
