@@ -3,6 +3,7 @@ import multer from "multer";
 import { AuthController } from "./auth.controller.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { requireAuth } from "../../shared/middlewares/auth.js";
+import { authRateLimit } from "../../shared/middlewares/rate-limit.js";
 import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from "./auth.schema.js";
 
 const upload = multer({
@@ -20,8 +21,8 @@ const upload = multer({
 const router = Router();
 const controller = new AuthController();
 
-router.post("/login", validate(loginSchema), controller.login);
-router.post("/register", validate(registerSchema), controller.register);
+router.post("/login", authRateLimit(), validate(loginSchema), controller.login);
+router.post("/register", authRateLimit(), validate(registerSchema), controller.register);
 router.post("/refresh", controller.refresh);
 router.post("/logout", controller.logout);
 router.get("/me", requireAuth, controller.me);
@@ -29,6 +30,7 @@ router.patch("/me", requireAuth, validate(updateProfileSchema), controller.updat
 router.post("/me/avatar", requireAuth, upload.single("avatar"), controller.uploadAvatar);
 router.post(
   "/change-password",
+  authRateLimit(),
   requireAuth,
   validate(changePasswordSchema),
   controller.changePassword,

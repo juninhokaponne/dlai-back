@@ -7,7 +7,7 @@ import { pinoHttp } from "pino-http";
 import { router } from "./routes/index.js";
 import { errorHandler } from "./shared/middlewares/error-handler.js";
 import { notFound } from "./shared/middlewares/not-found.js";
-import { ratelimit } from "./shared/middlewares/rate-limit.js";
+import { apiRateLimit } from "./shared/middlewares/rate-limit.js";
 import { handleStripeWebhook } from "./modules/billing/billing.webhook.js";
 import { rootLogger } from "./shared/logger/logger.js";
 import { buildOpenApiDocument } from "./shared/openapi/document.js";
@@ -59,7 +59,7 @@ app.post(
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
-app.use(ratelimit());
+app.use(apiRateLimit());
 app.use("/api", router);
 
 app.use(notFound);
