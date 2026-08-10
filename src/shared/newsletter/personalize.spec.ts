@@ -27,4 +27,10 @@ describe("personalizeContent", () => {
   it("leaves content without placeholders untouched", () => {
     expect(personalizeContent("No placeholders here.", "Ana")).toBe("No placeholders here.");
   });
+
+  it("strips the editor's merge-tag chip markup entirely, not just its text", () => {
+    const html =
+      'Ola <span data-variable="name" class="merge-tag inline-flex items-center rounded-md bg-violet-100 px-1.5 py-0.5 text-[0.95em] font-medium text-violet-700">{{name}}</span>, bem-vindo!';
+    expect(personalizeContent(html, "Maria")).toBe("Ola Maria, bem-vindo!");
+  });
 });
