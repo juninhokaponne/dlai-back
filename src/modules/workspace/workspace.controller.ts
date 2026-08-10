@@ -93,10 +93,10 @@ export class WorkspaceController {
 
       const prompt =
         topics.length > 0
-          ? `Baseado nesses temas anteriores de newsletter do usuario: ${topics.join(", ")}. Sugira ${MAX_SUGGESTIONS} novos temas de newsletter relacionados, criativos e especificos. Um por linha, sem numeracao, sem explicacao.
+          ? `Based on these previous newsletter topics from the user: ${topics.join(", ")}. Suggest ${MAX_SUGGESTIONS} new, related, creative and specific newsletter topics. One per line, no numbering, no explanation.
 
 ${languageInstructionForLocale(user?.locale ?? "en")}`
-          : `Sugira ${MAX_SUGGESTIONS} temas interessantes e variados para uma newsletter. Um por linha, sem numeracao, sem explicacao.
+          : `Suggest ${MAX_SUGGESTIONS} interesting and varied newsletter topics. One per line, no numbering, no explanation.
 
 ${languageInstructionForLocale(user?.locale ?? "en")}`;
 
@@ -118,7 +118,7 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
 
       const result = await aiService.run(
         "body",
-        `Reescreva o texto abaixo para ficar mais conciso, envolvente e bem escrito, mantendo o mesmo idioma e o sentido original. Responda apenas com o texto reescrito, sem comentarios ou explicacoes.\n\nTexto original:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
+        `Rewrite the text below to be more concise, engaging and well written, keeping the same language and original meaning. Reply only with the rewritten text, no comments or explanations.\n\nOriginal text:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
       );
 
       return res.json({ result: result.content.trim(), creditBalance });
@@ -136,7 +136,7 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
 
       const result = await aiService.run(
         "body",
-        `Resuma o conteudo abaixo (pode ser um post de blog, artigo ou notas) em um formato pronto para virar uma newsletter: um paragrafo de abertura curto seguido dos pontos principais. Mantenha o mesmo idioma do texto original. Responda apenas com o resumo, sem comentarios.\n\nConteudo original:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
+        `Summarize the content below (it may be a blog post, article or notes) into a format ready to become a newsletter: a short opening paragraph followed by the main points. Keep the same language as the original text. Reply only with the summary, no comments.\n\nOriginal content:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
       );
 
       return res.json({ result: result.content.trim(), creditBalance });
@@ -154,7 +154,7 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
 
       const result = await aiService.run(
         "title",
-        `Gere ${MAX_SUGGESTIONS} sugestoes de assunto (subject line) de email chamativas para o conteudo abaixo, no mesmo idioma do texto. Um por linha, sem numeracao, sem aspas, sem explicacao.\n\nConteudo:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
+        `Generate ${MAX_SUGGESTIONS} catchy email subject line suggestions for the content below, in the same language as the text. One per line, no numbering, no quotes, no explanation.\n\nContent:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
       );
 
       const suggestions = splitLines(result.content, MAX_SUGGESTIONS);

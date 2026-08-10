@@ -75,11 +75,11 @@ export class TemplatesController {
     try {
       const { name, description, category, useImages, useLinks } = req.body;
 
-      const prompt = `Gere o corpo de um template de email de newsletter reutilizavel. O template se chama "${name}" e a descricao/objetivo e: "${description}". Seja conciso.
+      const prompt = `Write the body of a reusable newsletter email template. The template is called "${name}" and its description/purpose is: "${description}". Be concise.
 
 ${buildEmailDesignInstructions({ useImages, useLinks })}
 
-Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.
+You can personalize the email using exactly these placeholders (with double curly braces), without inventing other variants: {{name}} for the subscriber's name, {{sender_name}} for the sender's name, {{company}} for the sender's company, and {{date}} for today's date. Only use the ones that make sense for the content - don't force the use of all of them.
 
 ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`;
       const result = await aiService.run("body", prompt);
