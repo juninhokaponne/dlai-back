@@ -1,4 +1,7 @@
 import type { NextFunction, Response } from "express";
+import { eq } from "drizzle-orm";
+import { db } from "../../database/index.js";
+import { subscriptions } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { PLANS, PLAN_KEYS, type PlanKey } from "../../shared/billing/plans.config.js";
 import { getStripeClient } from "../../shared/billing/stripe-client.js";
@@ -45,6 +48,24 @@ export class BillingController {
       });
 
       return res.status(201).json({ url: session.url });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getSubscription(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const [subscription] = await db
+        .select({
+          plan: subscriptions.plan,
+          status: subscriptions.status,
+          currentPeriodEnd: subscriptions.currentPeriodEnd,
+        })
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, req.user!.userId))
+        .limit(1);
+
+      return res.json({ subscription: subscription ?? null });
     } catch (err) {
       next(err);
     }

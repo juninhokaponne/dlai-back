@@ -358,6 +358,18 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/billing/subscription",
+  tags: ["Billing"],
+  summary: "Assinatura atual do usuario autenticado (null se nunca assinou)",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Assinatura atual", content: { "application/json": { schema: z.object({ subscription: z.object({}).nullable() }) } } },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Workspace
 // ---------------------------------------------------------------------------

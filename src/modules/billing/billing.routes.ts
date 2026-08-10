@@ -8,6 +8,7 @@ const router = Router();
 const controller = new BillingController();
 
 router.get("/plans", controller.listPlans);
+router.get("/subscription", requireAuth, controller.getSubscription);
 router.post("/checkout", requireAuth, validate(checkoutSchema), controller.checkout);
 
 export { router as billingRoutes };
