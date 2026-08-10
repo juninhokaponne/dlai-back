@@ -64,6 +64,13 @@
       "when": 1786315121944,
       "tag": "0008_bumpy_shiver_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786320808709,
+      "tag": "0009_mysterious_rocket_racer",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import {
 } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
+import { SpacesStorageProvider } from "../../shared/storage/spaces.provider.js";
 import {
   generateAccessToken,
   generateRefreshTokenRaw,
@@ -16,6 +17,12 @@ import {
   refreshTokenExpiry,
   verifyPassword,
 } from "../../shared/utils/security.js";
+
+const AVATAR_EXTENSION_BY_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
 
 const REFRESH_COOKIE = "refreshToken";
 const REFRESH_COOKIE_OPTIONS = {
@@ -223,6 +230,7 @@ export class AuthController {
           lastName: users.lastName,
           email: users.email,
           company: users.company,
+          avatarUrl: users.avatarUrl,
           isEmailVerified: users.isEmailVerified,
           creditBalance: users.creditBalance,
           createdAt: users.createdAt,
@@ -260,6 +268,44 @@ export class AuthController {
           lastName: users.lastName,
           email: users.email,
           company: users.company,
+          avatarUrl: users.avatarUrl,
+          isEmailVerified: users.isEmailVerified,
+          creditBalance: users.creditBalance,
+          createdAt: users.createdAt,
+        });
+
+      return res.json({ user });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async uploadAvatar(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: "Image file is required (field 'avatar')." });
+      }
+
+      const extension = AVATAR_EXTENSION_BY_MIME[file.mimetype];
+      if (!extension) {
+        return res.status(400).json({ error: "Only PNG, JPEG or WEBP images are allowed." });
+      }
+
+      const storage = new SpacesStorageProvider();
+      const avatarUrl = await storage.uploadAvatar(req.user!.userId, file.buffer, file.mimetype, extension);
+
+      const [user] = await db
+        .update(users)
+        .set({ avatarUrl, updatedAt: new Date() })
+        .where(eq(users.id, req.user!.userId))
+        .returning({
+          id: users.id,
+          name: users.name,
+          lastName: users.lastName,
+          email: users.email,
+          company: users.company,
+          avatarUrl: users.avatarUrl,
           isEmailVerified: users.isEmailVerified,
           creditBalance: users.creditBalance,
           createdAt: users.createdAt,

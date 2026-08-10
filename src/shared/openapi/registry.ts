@@ -128,6 +128,19 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/me/avatar",
+  tags: ["Auth"],
+  summary: "Envia a foto de perfil do usuario autenticado (multipart/form-data, campo 'avatar')",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Avatar atualizado", content: { "application/json": { schema: z.object({ user: z.object({}) } ) } } },
+    400: errorResponse("Arquivo ausente ou formato invalido"),
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Newsletters
 // ---------------------------------------------------------------------------
