@@ -35,7 +35,7 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
 
   const body = await aiService.run(
     "body",
-    `Gere o corpo de um email de newsletter em HTML simples (sem tags html/head/body, so o conteudo com paragrafos) sobre o tema: "${newsletter.topic}". O titulo da newsletter e: "${title.content}". Seja conciso e envolvente.`,
+    `Gere o corpo de um email de newsletter em HTML simples (sem tags html/head/body, so o conteudo com paragrafos) sobre o tema: "${newsletter.topic}". O titulo da newsletter e: "${title.content}". Seja conciso e envolvente. Se quiser saudar o assinante pelo nome, use exatamente o placeholder {{name}} (assim, com chaves duplas) e nao invente outras variantes como [Nome] ou [Nome do Assinante] - esse placeholder sera substituido automaticamente pelo nome real de cada assinante no envio.`,
     bodyModel,
   );
 

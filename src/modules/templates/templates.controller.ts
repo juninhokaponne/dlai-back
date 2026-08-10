@@ -73,7 +73,7 @@ export class TemplatesController {
     try {
       const { name, description, category } = req.body;
 
-      const prompt = `Gere o corpo de um template de email de newsletter reutilizavel, em HTML simples (sem tags html/head/body, so o conteudo com paragrafos, titulos e placeholders como [Nome], [Empresa] onde fizer sentido). O template se chama "${name}" e a descricao/objetivo e: "${description}". Seja conciso.`;
+      const prompt = `Gere o corpo de um template de email de newsletter reutilizavel, em HTML simples (sem tags html/head/body, so o conteudo com paragrafos e titulos). O template se chama "${name}" e a descricao/objetivo e: "${description}". Seja conciso. Se quiser saudar o assinante pelo nome, use exatamente o placeholder {{name}} (assim, com chaves duplas) e nao invente outras variantes como [Nome] ou [Nome do Assinante] - esse placeholder sera substituido automaticamente pelo nome real de cada assinante quando o template for usado.`;
       const result = await aiService.run("body", prompt);
 
       const [template] = await db

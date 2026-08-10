@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../database/index.js";
 import { newsletters, contacts } from "../database/schema/schema.js";
 import { ResendEmailProvider } from "../shared/email/resend.provider.js";
+import { personalizeContent } from "../shared/newsletter/personalize.js";
 import { getRedisConnection } from "./redis-connection.js";
 import {
   NEWSLETTER_SEND_QUEUE,
@@ -55,10 +56,12 @@ async function processJob(job: Job<NewsletterSendJobData>) {
   for (const contact of recipients) {
     try {
       const unsubscribeUrl = unsubscribeUrlFor(contact.unsubscribeToken);
+      const personalizedContent = personalizeContent(newsletter.content, contact.name);
+      const personalizedSubject = personalizeContent(newsletter.title, contact.name);
       await emailProvider.send({
         to: contact.email,
-        subject: newsletter.title,
-        html: buildEmailHtml(newsletter.content, unsubscribeUrl),
+        subject: personalizedSubject,
+        html: buildEmailHtml(personalizedContent, unsubscribeUrl),
         headers: {
           "List-Unsubscribe": `<${unsubscribeUrl}>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
