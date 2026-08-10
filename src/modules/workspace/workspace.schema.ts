@@ -10,3 +10,7 @@ export const workspaceGenerateSchema = z.object({
   topic: z.string().trim().min(1).max(500),
   model: z.enum(bodyModelIds).optional(),
 });
+
+export const workspaceTextActionSchema = z.object({
+  text: z.string().trim().min(1).max(8000),
+});

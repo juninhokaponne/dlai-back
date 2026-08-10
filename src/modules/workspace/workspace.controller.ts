@@ -6,10 +6,20 @@ import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { AIService } from "../../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../../shared/ai/openrouter.provider.js";
 import { createNewsletter, startNewsletterGeneration } from "../newsletter/newsletter.service.js";
+import { debitCredits } from "../../shared/billing/credits.service.js";
+import { QUICK_ACTION_CREDIT_COST } from "../../shared/billing/credits.config.js";
 
 const aiService = new AIService(new OpenRouterProvider());
 const MAX_SUGGESTIONS = 5;
 const RECENT_TOPICS_SAMPLE = 10;
+
+function splitLines(content: string, max: number): string[] {
+  return content
+    .split("\n")
+    .map((line) => line.trim().replace(/^[-*\d.]+\s*/, ""))
+    .filter(Boolean)
+    .slice(0, max);
+}
 
 export class WorkspaceController {
   async overview(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -80,14 +90,65 @@ export class WorkspaceController {
           : `Sugira ${MAX_SUGGESTIONS} temas interessantes e variados para uma newsletter. Um por linha, sem numeracao, sem explicacao.`;
 
       const result = await aiService.run("title", prompt);
-
-      const suggestions = result.content
-        .split("\n")
-        .map((line) => line.trim().replace(/^[-*\d.]+\s*/, ""))
-        .filter(Boolean)
-        .slice(0, MAX_SUGGESTIONS);
+      const suggestions = splitLines(result.content, MAX_SUGGESTIONS);
 
       return res.json({ suggestions });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async rewrite(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+      const { text } = req.body;
+
+      const creditBalance = await debitCredits(userId, QUICK_ACTION_CREDIT_COST, "generation_debit");
+
+      const result = await aiService.run(
+        "body",
+        `Reescreva o texto abaixo para ficar mais conciso, envolvente e bem escrito, mantendo o mesmo idioma e o sentido original. Responda apenas com o texto reescrito, sem comentarios ou explicacoes.\n\nTexto original:\n"""${text}"""`,
+      );
+
+      return res.json({ result: result.content.trim(), creditBalance });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async summarize(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+      const { text } = req.body;
+
+      const creditBalance = await debitCredits(userId, QUICK_ACTION_CREDIT_COST, "generation_debit");
+
+      const result = await aiService.run(
+        "body",
+        `Resuma o conteudo abaixo (pode ser um post de blog, artigo ou notas) em um formato pronto para virar uma newsletter: um paragrafo de abertura curto seguido dos pontos principais. Mantenha o mesmo idioma do texto original. Responda apenas com o resumo, sem comentarios.\n\nConteudo original:\n"""${text}"""`,
+      );
+
+      return res.json({ result: result.content.trim(), creditBalance });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async subjectLines(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+      const { text } = req.body;
+
+      const creditBalance = await debitCredits(userId, QUICK_ACTION_CREDIT_COST, "generation_debit");
+
+      const result = await aiService.run(
+        "title",
+        `Gere ${MAX_SUGGESTIONS} sugestoes de assunto (subject line) de email chamativas para o conteudo abaixo, no mesmo idioma do texto. Um por linha, sem numeracao, sem aspas, sem explicacao.\n\nConteudo:\n"""${text}"""`,
+      );
+
+      const suggestions = splitLines(result.content, MAX_SUGGESTIONS);
+
+      return res.json({ suggestions, creditBalance });
     } catch (err) {
       next(err);
     }

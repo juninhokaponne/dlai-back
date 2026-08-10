@@ -12,7 +12,7 @@ import {
   updateNewsletterSchema,
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
-import { workspaceGenerateSchema } from "../../modules/workspace/workspace.schema.js";
+import { workspaceGenerateSchema, workspaceTextActionSchema } from "../../modules/workspace/workspace.schema.js";
 import { contactRowSchema } from "../../modules/contacts/contact.schema.js";
 import { createTemplateSchema, generateTemplateSchema } from "../../modules/templates/template.schema.js";
 
@@ -432,6 +432,45 @@ registry.registerPath({
   responses: {
     202: { description: "Geracao enfileirada", content: { "application/json": { schema: z.object({ newsletter: z.object({}), creditBalance: z.number() }) } } },
     400: errorResponse("Sem creditos suficientes"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/workspace/rewrite",
+  tags: ["Workspace"],
+  summary: "Reescreve um texto via IA (debita credito)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: workspaceTextActionSchema } } } },
+  responses: {
+    200: { description: "Texto reescrito", content: { "application/json": { schema: z.object({ result: z.string(), creditBalance: z.number() }) } } },
+    402: errorResponse("Sem creditos suficientes"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/workspace/summarize",
+  tags: ["Workspace"],
+  summary: "Resume um texto/blog em formato de newsletter via IA (debita credito)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: workspaceTextActionSchema } } } },
+  responses: {
+    200: { description: "Resumo gerado", content: { "application/json": { schema: z.object({ result: z.string(), creditBalance: z.number() }) } } },
+    402: errorResponse("Sem creditos suficientes"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/workspace/subject-lines",
+  tags: ["Workspace"],
+  summary: "Gera sugestoes de assunto de email via IA (debita credito)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: workspaceTextActionSchema } } } },
+  responses: {
+    200: { description: "Sugestoes geradas", content: { "application/json": { schema: z.object({ suggestions: z.array(z.string()), creditBalance: z.number() }) } } },
+    402: errorResponse("Sem creditos suficientes"),
   },
 });
 
