@@ -2,10 +2,11 @@ import type { NextFunction, Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { templates } from "../../database/schema/schema.js";
+import { newsletters, templates } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { AIService } from "../../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../../shared/ai/openrouter.provider.js";
+import { buildEmailDesignInstructions } from "../../shared/ai/email-design-prompt.js";
 
 const aiService = new AIService(new OpenRouterProvider());
 const idParamSchema = z.string().uuid();
@@ -71,9 +72,13 @@ export class TemplatesController {
 
   async generateWithAi(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { name, description, category } = req.body;
+      const { name, description, category, useImages, useLinks } = req.body;
 
-      const prompt = `Gere o corpo de um template de email de newsletter reutilizavel, em HTML simples (sem tags html/head/body, so o conteudo com paragrafos e titulos). O template se chama "${name}" e a descricao/objetivo e: "${description}". Seja conciso. Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.`;
+      const prompt = `Gere o corpo de um template de email de newsletter reutilizavel. O template se chama "${name}" e a descricao/objetivo e: "${description}". Seja conciso.
+
+${buildEmailDesignInstructions({ useImages, useLinks })}
+
+Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.`;
       const result = await aiService.run("body", prompt);
 
       const [template] = await db
@@ -89,6 +94,40 @@ export class TemplatesController {
         .returning();
 
       return res.status(201).json({ template });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async useForNewsletter(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedId = idParamSchema.safeParse(req.params.id);
+      if (!parsedId.success) {
+        return res.status(400).json({ error: "Invalid template id." });
+      }
+
+      const [template] = await db
+        .select()
+        .from(templates)
+        .where(and(eq(templates.id, parsedId.data), eq(templates.userId, req.user!.userId)))
+        .limit(1);
+
+      if (!template) {
+        return res.status(404).json({ error: "Template not found." });
+      }
+
+      const [newsletter] = await db
+        .insert(newsletters)
+        .values({
+          userId: req.user!.userId,
+          topic: template.name,
+          title: template.name,
+          content: template.contentHtml,
+          status: "ready",
+        })
+        .returning();
+
+      return res.status(201).json({ newsletter });
     } catch (err) {
       next(err);
     }

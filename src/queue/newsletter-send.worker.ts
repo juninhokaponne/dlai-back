@@ -20,12 +20,16 @@ function unsubscribeUrlFor(unsubscribeToken: string): string {
 
 function buildEmailHtml(content: string, unsubscribeUrl: string): string {
   return `
-${content}
-<hr style="margin-top: 32px; border: none; border-top: 1px solid #ddd;" />
-<p style="font-size: 12px; color: #888;">
-  Voce esta recebendo este email porque se inscreveu para receber novidades.
-  <a href="${unsubscribeUrl}">Cancelar inscricao</a>
-</p>
+<div style="background-color:#f4f4f5;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:12px;padding:32px;">
+    ${content}
+    <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb;" />
+    <p style="font-size:12px;color:#9ca3af;margin-top:16px;">
+      Voce esta recebendo este email porque se inscreveu para receber novidades.
+      <a href="${unsubscribeUrl}" style="color:#9ca3af;">Cancelar inscricao</a>
+    </p>
+  </div>
+</div>
 `;
 }
 

@@ -13,6 +13,7 @@ router.get("/", controller.list);
 router.post("/", validate(createTemplateSchema), controller.create);
 router.post("/generate", validate(generateTemplateSchema), controller.generateWithAi);
 router.get("/:id", controller.get);
+router.post("/:id/use", controller.useForNewsletter);
 router.delete("/:id", controller.remove);
 
 export { router as templatesRoutes };

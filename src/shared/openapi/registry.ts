@@ -480,6 +480,19 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "post",
+  path: "/api/templates/{id}/use",
+  tags: ["Templates"],
+  summary: "Cria uma newsletter (status ready) a partir do conteudo de um template",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    201: { description: "Newsletter criada a partir do template", content: { "application/json": { schema: z.object({ newsletter: z.object({}) }) } } },
+    404: errorResponse("Template nao encontrado"),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Uploads
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { db } from "../database/index.js";
 import { newsletters } from "../database/schema/schema.js";
 import { AIService } from "../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../shared/ai/openrouter.provider.js";
+import { buildEmailDesignInstructions } from "../shared/ai/email-design-prompt.js";
 import { getRedisConnection } from "./redis-connection.js";
 import {
   NEWSLETTER_GENERATE_QUEUE,
@@ -35,7 +36,11 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
 
   const body = await aiService.run(
     "body",
-    `Gere o corpo de um email de newsletter em HTML simples (sem tags html/head/body, so o conteudo com paragrafos) sobre o tema: "${newsletter.topic}". O titulo da newsletter e: "${title.content}". Seja conciso e envolvente. Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.`,
+    `Gere o corpo de um email de newsletter sobre o tema: "${newsletter.topic}". O titulo da newsletter e: "${title.content}". Seja conciso e envolvente.
+
+${buildEmailDesignInstructions({ useImages: true, useLinks: true })}
+
+Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.`,
     bodyModel,
   );
 
