@@ -8,6 +8,7 @@ import { OpenRouterProvider } from "../../shared/ai/openrouter.provider.js";
 import { createNewsletter, startNewsletterGeneration } from "../newsletter/newsletter.service.js";
 import { debitCredits } from "../../shared/billing/credits.service.js";
 import { QUICK_ACTION_CREDIT_COST } from "../../shared/billing/credits.config.js";
+import { MATCH_INPUT_LANGUAGE_INSTRUCTION, languageInstructionForLocale } from "../../shared/ai/language-instruction.js";
 
 const aiService = new AIService(new OpenRouterProvider());
 const MAX_SUGGESTIONS = 5;
@@ -75,6 +76,12 @@ export class WorkspaceController {
     try {
       const userId = req.user!.userId;
 
+      const [user] = await db
+        .select({ locale: users.locale })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
       const recent = await db
         .select({ topic: newsletters.topic })
         .from(newsletters)
@@ -86,8 +93,12 @@ export class WorkspaceController {
 
       const prompt =
         topics.length > 0
-          ? `Baseado nesses temas anteriores de newsletter do usuario: ${topics.join(", ")}. Sugira ${MAX_SUGGESTIONS} novos temas de newsletter relacionados, criativos e especificos. Um por linha, sem numeracao, sem explicacao.`
-          : `Sugira ${MAX_SUGGESTIONS} temas interessantes e variados para uma newsletter. Um por linha, sem numeracao, sem explicacao.`;
+          ? `Baseado nesses temas anteriores de newsletter do usuario: ${topics.join(", ")}. Sugira ${MAX_SUGGESTIONS} novos temas de newsletter relacionados, criativos e especificos. Um por linha, sem numeracao, sem explicacao.
+
+${languageInstructionForLocale(user?.locale ?? "en")}`
+          : `Sugira ${MAX_SUGGESTIONS} temas interessantes e variados para uma newsletter. Um por linha, sem numeracao, sem explicacao.
+
+${languageInstructionForLocale(user?.locale ?? "en")}`;
 
       const result = await aiService.run("title", prompt);
       const suggestions = splitLines(result.content, MAX_SUGGESTIONS);
@@ -107,7 +118,7 @@ export class WorkspaceController {
 
       const result = await aiService.run(
         "body",
-        `Reescreva o texto abaixo para ficar mais conciso, envolvente e bem escrito, mantendo o mesmo idioma e o sentido original. Responda apenas com o texto reescrito, sem comentarios ou explicacoes.\n\nTexto original:\n"""${text}"""`,
+        `Reescreva o texto abaixo para ficar mais conciso, envolvente e bem escrito, mantendo o mesmo idioma e o sentido original. Responda apenas com o texto reescrito, sem comentarios ou explicacoes.\n\nTexto original:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
       );
 
       return res.json({ result: result.content.trim(), creditBalance });
@@ -125,7 +136,7 @@ export class WorkspaceController {
 
       const result = await aiService.run(
         "body",
-        `Resuma o conteudo abaixo (pode ser um post de blog, artigo ou notas) em um formato pronto para virar uma newsletter: um paragrafo de abertura curto seguido dos pontos principais. Mantenha o mesmo idioma do texto original. Responda apenas com o resumo, sem comentarios.\n\nConteudo original:\n"""${text}"""`,
+        `Resuma o conteudo abaixo (pode ser um post de blog, artigo ou notas) em um formato pronto para virar uma newsletter: um paragrafo de abertura curto seguido dos pontos principais. Mantenha o mesmo idioma do texto original. Responda apenas com o resumo, sem comentarios.\n\nConteudo original:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
       );
 
       return res.json({ result: result.content.trim(), creditBalance });
@@ -143,7 +154,7 @@ export class WorkspaceController {
 
       const result = await aiService.run(
         "title",
-        `Gere ${MAX_SUGGESTIONS} sugestoes de assunto (subject line) de email chamativas para o conteudo abaixo, no mesmo idioma do texto. Um por linha, sem numeracao, sem aspas, sem explicacao.\n\nConteudo:\n"""${text}"""`,
+        `Gere ${MAX_SUGGESTIONS} sugestoes de assunto (subject line) de email chamativas para o conteudo abaixo, no mesmo idioma do texto. Um por linha, sem numeracao, sem aspas, sem explicacao.\n\nConteudo:\n"""${text}"""\n\n${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
       );
 
       const suggestions = splitLines(result.content, MAX_SUGGESTIONS);

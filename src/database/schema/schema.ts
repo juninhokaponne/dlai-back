@@ -14,6 +14,7 @@ import { relations } from "drizzle-orm";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
 
 export const newsletterViewMode = pgEnum("newsletter_view_mode", ["list", "grid"]);
+export const userLocale = pgEnum("user_locale", ["en", "pt", "es"]);
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -34,6 +35,7 @@ export const users = pgTable("users", {
   creditBalance: integer("credit_balance").default(TRIAL_CREDITS).notNull(),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
   newsletterViewMode: newsletterViewMode("newsletter_view_mode").default("list").notNull(),
+  locale: userLocale("locale").default("en").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

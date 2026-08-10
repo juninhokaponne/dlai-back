@@ -7,6 +7,7 @@ import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { AIService } from "../../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../../shared/ai/openrouter.provider.js";
 import { buildEmailDesignInstructions } from "../../shared/ai/email-design-prompt.js";
+import { MATCH_INPUT_LANGUAGE_INSTRUCTION } from "../../shared/ai/language-instruction.js";
 
 const aiService = new AIService(new OpenRouterProvider());
 const idParamSchema = z.string().uuid();
@@ -78,7 +79,9 @@ export class TemplatesController {
 
 ${buildEmailDesignInstructions({ useImages, useLinks })}
 
-Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.`;
+Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.
+
+${MATCH_INPUT_LANGUAGE_INSTRUCTION}`;
       const result = await aiService.run("body", prompt);
 
       const [template] = await db

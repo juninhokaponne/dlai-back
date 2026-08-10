@@ -43,6 +43,7 @@ export const updateProfileSchema = z.object({
   addressPostalCode: z.string().trim().max(20).optional(),
   addressCountry: z.string().trim().max(255).optional(),
   newsletterViewMode: z.enum(["list", "grid"]).optional(),
+  locale: z.enum(["en", "pt", "es"]).optional(),
 });
 
 export const changePasswordSchema = z.object({

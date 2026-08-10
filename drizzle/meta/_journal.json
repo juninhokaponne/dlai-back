@@ -99,6 +99,13 @@
       "when": 1786369723485,
       "tag": "0013_magical_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786382669027,
+      "tag": "0014_left_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }

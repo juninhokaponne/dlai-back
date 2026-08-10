@@ -5,6 +5,7 @@ import { newsletters } from "../database/schema/schema.js";
 import { AIService } from "../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../shared/ai/openrouter.provider.js";
 import { buildEmailDesignInstructions } from "../shared/ai/email-design-prompt.js";
+import { MATCH_INPUT_LANGUAGE_INSTRUCTION } from "../shared/ai/language-instruction.js";
 import { getRedisConnection } from "./redis-connection.js";
 import {
   NEWSLETTER_GENERATE_QUEUE,
@@ -31,7 +32,9 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
 
   const title = await aiService.run(
     "title",
-    `Gere apenas um titulo curto e chamativo (maximo 60 caracteres, sem aspas) para uma newsletter sobre: "${newsletter.topic}".`,
+    `Gere apenas um titulo curto e chamativo (maximo 60 caracteres, sem aspas) para uma newsletter sobre: "${newsletter.topic}".
+
+${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
   );
 
   const body = await aiService.run(
@@ -40,7 +43,9 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
 
 ${buildEmailDesignInstructions({ useImages: false, useLinks: true })}
 
-Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.`,
+Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.
+
+${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
     bodyModel,
   );
 
