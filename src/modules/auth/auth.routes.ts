@@ -4,7 +4,13 @@ import { AuthController } from "./auth.controller.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { requireAuth } from "../../shared/middlewares/auth.js";
 import { authRateLimit } from "../../shared/middlewares/rate-limit.js";
-import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from "./auth.schema.js";
+import {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
+  verifyEmailSchema,
+} from "./auth.schema.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -35,5 +41,7 @@ router.post(
   validate(changePasswordSchema),
   controller.changePassword,
 );
+router.post("/verify-email", authRateLimit(), validate(verifyEmailSchema), controller.verifyEmail);
+router.post("/resend-verification", authRateLimit(), requireAuth, controller.resendVerificationEmail);
 
 export { router as authRoutes };

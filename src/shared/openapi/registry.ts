@@ -5,6 +5,7 @@ import {
   loginSchema,
   registerSchema,
   updateProfileSchema,
+  verifyEmailSchema,
 } from "../../modules/auth/auth.schema.js";
 import {
   createNewsletterSchema,
@@ -160,6 +161,30 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/verify-email",
+  tags: ["Auth"],
+  summary: "Confirma o email do usuario a partir do token enviado por email",
+  request: { body: { content: { "application/json": { schema: verifyEmailSchema } } } },
+  responses: {
+    200: { description: "Email confirmado", content: { "application/json": { schema: z.object({ message: z.string() }) } } },
+    400: errorResponse("Token invalido ou expirado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/resend-verification",
+  tags: ["Auth"],
+  summary: "Reenvia o email de confirmacao para o usuario autenticado",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Email de verificacao reenviado", content: { "application/json": { schema: z.object({ message: z.string() }) } } },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Newsletters
 // ---------------------------------------------------------------------------
@@ -276,6 +301,7 @@ registry.registerPath({
   responses: {
     202: { description: "Envio enfileirado", content: { "application/json": { schema: z.object({ newsletter: z.object({}), recipientCount: z.number() }) } } },
     400: errorResponse("Sem contacts subscribed ou newsletter nao esta pronta"),
+    403: errorResponse("Email do remetente ainda nao foi confirmado"),
     404: errorResponse("Newsletter nao encontrada"),
     409: errorResponse("Envio ja em andamento"),
   },

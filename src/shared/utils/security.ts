@@ -9,6 +9,7 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
 const JWT_SECRET = process.env.JWT_SECRET || "dev-only-insecure-secret";
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
+const EMAIL_VERIFICATION_TTL_HOURS = 48;
 
 export async function hashPassword(password: string): Promise<string> {
   return await hash(password, {
@@ -51,5 +52,15 @@ export function hashToken(token: string): string {
 export function refreshTokenExpiry(): Date {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_TTL_DAYS);
+  return expiresAt;
+}
+
+export function generateVerificationTokenRaw(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+export function verificationTokenExpiry(): Date {
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + EMAIL_VERIFICATION_TTL_HOURS);
   return expiresAt;
 }

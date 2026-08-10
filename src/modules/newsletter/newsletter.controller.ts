@@ -2,7 +2,7 @@ import type { NextFunction, Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { newsletters } from "../../database/schema/schema.js";
+import { newsletters, users } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { getNewsletterSendQueue } from "../../queue/newsletter-send.queue.js";
 import { contacts } from "../../database/schema/schema.js";
@@ -165,6 +165,19 @@ export class NewsletterController {
       if (newsletter.status !== "ready" && newsletter.status !== "sent") {
         return res.status(409).json({
           error: "Newsletter must be generated (status 'ready') before sending.",
+        });
+      }
+
+      const [sender] = await db
+        .select({ isEmailVerified: users.isEmailVerified })
+        .from(users)
+        .where(eq(users.id, req.user!.userId))
+        .limit(1);
+
+      if (!sender?.isEmailVerified) {
+        return res.status(403).json({
+          error: "Confirm your email address before sending newsletters to subscribers.",
+          code: "EMAIL_NOT_VERIFIED",
         });
       }
 

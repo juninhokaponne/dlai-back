@@ -6,6 +6,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],
+    "jsx": "react-jsx",
 
     // Strictness (fundamental)
     "strict": true,
@@ -34,6 +35,6 @@
     // Perfomance
     "incremental": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist", "src/tests", "**/*.spec.ts", "**/*.test.ts"]
 }

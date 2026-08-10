@@ -15,6 +15,17 @@ jest.unstable_mockModule("../../shared/utils/security.js", () => ({
   generateRefreshTokenRaw: jest.fn(),
   hashToken: jest.fn(),
   refreshTokenExpiry: jest.fn(),
+  generateVerificationTokenRaw: jest.fn(),
+  verificationTokenExpiry: jest.fn(),
+}));
+
+jest.unstable_mockModule("./email-verification.service.js", () => ({
+  createVerificationToken: jest.fn().mockResolvedValue("mock-token"),
+  confirmVerificationToken: jest.fn(),
+}));
+
+jest.unstable_mockModule("../../shared/email/send-welcome-email.js", () => ({
+  sendWelcomeVerificationEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
 const { AuthController } = await import("./auth.controller.js");

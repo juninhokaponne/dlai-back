@@ -17,6 +17,12 @@ import {
   refreshTokenExpiry,
   verifyPassword,
 } from "../../shared/utils/security.js";
+import { confirmVerificationToken, createVerificationToken } from "./email-verification.service.js";
+import { sendWelcomeVerificationEmail } from "../../shared/email/send-welcome-email.js";
+import type { EmailLocale } from "../../shared/email/templates/copy.js";
+import { createLogger } from "../../shared/logger/logger.js";
+
+const logger = createLogger("auth.controller");
 
 const AVATAR_EXTENSION_BY_MIME: Record<string, string> = {
   "image/png": "png",
@@ -55,8 +61,9 @@ const REFRESH_COOKIE_OPTIONS = {
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const { name, lastname, age, email, password, company } = req.body;
+      const { name, lastname, age, email, password, company, locale } = req.body;
       const lastName = lastname;
+      const userLocale: EmailLocale = locale ?? "en";
 
       const existingUser = await db
         .select({ id: users.id })
@@ -73,7 +80,7 @@ export class AuthController {
       const newUser = await db.transaction(async (tx) => {
         const [created] = await tx
           .insert(users)
-          .values({ name, lastName, age, company, email, passwordHash })
+          .values({ name, lastName, age, company, email, passwordHash, locale: userLocale })
           .returning();
 
         await tx.insert(creditTransactions).values({
@@ -89,6 +96,17 @@ export class AuthController {
       // when the request starts), so attach the identity we just created
       // for the request-completion log line to pick up.
       (req as AuthenticatedRequest).user = { userId: newUser!.id, email: newUser!.email };
+
+      createVerificationToken(newUser!.id)
+        .then((token) =>
+          sendWelcomeVerificationEmail({
+            email: newUser!.email,
+            locale: userLocale,
+            name: newUser!.name,
+            verificationToken: token,
+          }),
+        )
+        .catch((err) => logger.error({ err }, "Failed to queue welcome/verification email"));
 
       return res.status(201).json({
         message: "User created successfully!",
@@ -362,6 +380,60 @@ export class AuthController {
 
       res.clearCookie(REFRESH_COOKIE, REFRESH_COOKIE_OPTIONS);
       return res.json({ message: "Password updated. Please sign in again." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async verifyEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token } = req.body;
+      const result = await confirmVerificationToken(token);
+
+      if (result === "invalid") {
+        return res.status(400).json({ error: "This verification link is invalid." });
+      }
+
+      if (result === "expired") {
+        return res.status(400).json({ error: "This verification link has expired." });
+      }
+
+      return res.json({ message: "Email confirmed." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resendVerificationEmail(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const [user] = await db
+        .select({
+          email: users.email,
+          isEmailVerified: users.isEmailVerified,
+          locale: users.locale,
+          name: users.name,
+        })
+        .from(users)
+        .where(eq(users.id, req.user!.userId))
+        .limit(1);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found." });
+      }
+
+      if (user.isEmailVerified) {
+        return res.json({ message: "Email already confirmed." });
+      }
+
+      const token = await createVerificationToken(req.user!.userId);
+      await sendWelcomeVerificationEmail({
+        email: user.email,
+        locale: user.locale as EmailLocale,
+        name: user.name,
+        verificationToken: token,
+      });
+
+      return res.json({ message: "Verification email sent." });
     } catch (err) {
       next(err);
     }

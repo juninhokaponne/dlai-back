@@ -30,6 +30,7 @@ export const registerSchema = z.object({
   password: strongPasswordSchema,
   age: z.number().optional(),
   company: z.string().max(32).optional(),
+  locale: z.enum(["en", "pt", "es"]).optional(),
 });
 
 export const updateProfileSchema = z.object({
@@ -49,6 +50,10 @@ export const updateProfileSchema = z.object({
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Enter your current password."),
   newPassword: strongPasswordSchema,
+});
+
+export const verifyEmailSchema = z.object({
+  token: z.string().nonempty(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
