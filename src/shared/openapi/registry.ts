@@ -14,6 +14,7 @@ import {
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
 import { workspaceGenerateSchema } from "../../modules/workspace/workspace.schema.js";
 import { contactRowSchema } from "../../modules/contacts/contact.schema.js";
+import { createTemplateSchema, generateTemplateSchema } from "../../modules/templates/template.schema.js";
 
 extendZodWithOpenApi(z);
 
@@ -418,6 +419,51 @@ registry.registerPath({
   responses: {
     202: { description: "Geracao enfileirada", content: { "application/json": { schema: z.object({ newsletter: z.object({}), creditBalance: z.number() }) } } },
     400: errorResponse("Sem creditos suficientes"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/templates",
+  tags: ["Templates"],
+  summary: "Lista os templates salvos do usuario",
+  security: bearerAuth,
+  responses: { 200: { description: "Lista de templates", content: { "application/json": { schema: z.object({ templates: z.array(z.object({})) }) } } } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/templates",
+  tags: ["Templates"],
+  summary: "Cria um template manualmente",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: createTemplateSchema } } } },
+  responses: { 201: { description: "Template criado", content: { "application/json": { schema: z.object({ template: z.object({}) }) } } } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/templates/generate",
+  tags: ["Templates"],
+  summary: "Gera um template via IA a partir de nome e descricao",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: generateTemplateSchema } } } },
+  responses: { 201: { description: "Template gerado", content: { "application/json": { schema: z.object({ template: z.object({}) }) } } } },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/templates/{id}",
+  tags: ["Templates"],
+  summary: "Remove um template",
+  security: bearerAuth,
+  responses: {
+    204: { description: "Template removido" },
+    404: errorResponse("Template nao encontrado"),
   },
 });
 

@@ -94,6 +94,27 @@ export const newslettersRelations = relations(newsletters, ({ one }) => ({
   }),
 }));
 
+export const templates = pgTable("templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }),
+  contentHtml: text("content_html").notNull(),
+  aiGenerated: boolean("ai_generated").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const templatesRelations = relations(templates, ({ one }) => ({
+  user: one(users, {
+    fields: [templates.userId],
+    references: [users.id],
+  }),
+}));
+
 export const contactStatus = pgEnum("contact_status", [
   "subscribed",
   "unsubscribed",
