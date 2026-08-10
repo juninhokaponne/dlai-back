@@ -38,7 +38,7 @@ async function processJob(job: Job<NewsletterGenerateJobData>) {
     "body",
     `Gere o corpo de um email de newsletter sobre o tema: "${newsletter.topic}". O titulo da newsletter e: "${title.content}". Seja conciso e envolvente.
 
-${buildEmailDesignInstructions({ useImages: true, useLinks: true })}
+${buildEmailDesignInstructions({ useImages: false, useLinks: true })}
 
 Voce pode personalizar o email usando exatamente estes placeholders (com chaves duplas), sem inventar outras variantes: {{name}} para o nome do assinante que vai receber o email, {{sender_name}} para o nome de quem esta enviando, {{company}} para a empresa de quem esta enviando, e {{date}} para a data de hoje. Use apenas os que fizerem sentido para o conteudo - nao force o uso de todos.`,
     bodyModel,
