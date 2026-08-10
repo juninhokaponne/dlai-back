@@ -420,3 +420,20 @@ registry.registerPath({
     400: errorResponse("Sem creditos suficientes"),
   },
 });
+
+// ---------------------------------------------------------------------------
+// Uploads
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "post",
+  path: "/api/uploads/image",
+  tags: ["Uploads"],
+  summary: "Envia uma imagem generica (multipart/form-data, campo 'image') e retorna a URL publica",
+  security: bearerAuth,
+  responses: {
+    201: { description: "Imagem enviada", content: { "application/json": { schema: z.object({ url: z.string() }) } } },
+    400: errorResponse("Arquivo ausente ou formato invalido"),
+    401: errorResponse("Nao autenticado"),
+  },
+});

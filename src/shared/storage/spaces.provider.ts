@@ -32,8 +32,14 @@ export class SpacesStorageProvider {
     });
   }
 
-  async uploadAvatar(userId: string, buffer: Buffer, contentType: string, extension: string): Promise<string> {
-    const key = `avatars/${userId}-${randomUUID()}.${extension}`;
+  async uploadFile(
+    folder: string,
+    ownerId: string,
+    buffer: Buffer,
+    contentType: string,
+    extension: string,
+  ): Promise<string> {
+    const key = `${folder}/${ownerId}-${randomUUID()}.${extension}`;
 
     await this.client.send(
       new PutObjectCommand({
@@ -46,5 +52,9 @@ export class SpacesStorageProvider {
     );
 
     return `${this.publicUrl}/${key}`;
+  }
+
+  uploadAvatar(userId: string, buffer: Buffer, contentType: string, extension: string): Promise<string> {
+    return this.uploadFile("avatars", userId, buffer, contentType, extension);
   }
 }
