@@ -36,6 +36,17 @@ export const updateProfileSchema = z.object({
   name: z.string().trim().nonempty().max(255).optional(),
   lastname: z.string().trim().nonempty().max(255).optional(),
   company: z.string().trim().max(32).optional(),
+  addressLine1: z.string().trim().max(255).optional(),
+  addressLine2: z.string().trim().max(255).optional(),
+  addressCity: z.string().trim().max(255).optional(),
+  addressState: z.string().trim().max(255).optional(),
+  addressPostalCode: z.string().trim().max(20).optional(),
+  addressCountry: z.string().trim().max(255).optional(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Enter your current password."),
+  newPassword: strongPasswordSchema,
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

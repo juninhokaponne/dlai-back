@@ -3,7 +3,7 @@ import multer from "multer";
 import { AuthController } from "./auth.controller.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { requireAuth } from "../../shared/middlewares/auth.js";
-import { loginSchema, registerSchema, updateProfileSchema } from "./auth.schema.js";
+import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from "./auth.schema.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -27,5 +27,11 @@ router.post("/logout", controller.logout);
 router.get("/me", requireAuth, controller.me);
 router.patch("/me", requireAuth, validate(updateProfileSchema), controller.updateMe);
 router.post("/me/avatar", requireAuth, upload.single("avatar"), controller.uploadAvatar);
+router.post(
+  "/change-password",
+  requireAuth,
+  validate(changePasswordSchema),
+  controller.changePassword,
+);
 
 export { router as authRoutes };

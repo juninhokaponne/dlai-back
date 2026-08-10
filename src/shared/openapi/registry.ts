@@ -1,6 +1,11 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
-import { loginSchema, registerSchema, updateProfileSchema } from "../../modules/auth/auth.schema.js";
+import {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
+} from "../../modules/auth/auth.schema.js";
 import {
   createNewsletterSchema,
   generateSchema,
@@ -138,6 +143,19 @@ registry.registerPath({
     200: { description: "Avatar atualizado", content: { "application/json": { schema: z.object({ user: z.object({}) } ) } } },
     400: errorResponse("Arquivo ausente ou formato invalido"),
     401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/change-password",
+  tags: ["Auth"],
+  summary: "Troca a senha do usuario autenticado (revoga todas as sessoes)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: changePasswordSchema } } } },
+  responses: {
+    200: { description: "Senha atualizada", content: { "application/json": { schema: z.object({ message: z.string() }) } } },
+    401: errorResponse("Senha atual incorreta ou nao autenticado"),
   },
 });
 

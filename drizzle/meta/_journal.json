@@ -71,6 +71,13 @@
       "when": 1786320808709,
       "tag": "0009_mysterious_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786323756253,
+      "tag": "0010_past_tiger_shark",
+      "breakpoints": true
     }
   ]
 }

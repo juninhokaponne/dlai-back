@@ -24,6 +24,24 @@ const AVATAR_EXTENSION_BY_MIME: Record<string, string> = {
   "image/webp": "webp",
 };
 
+const USER_PROFILE_COLUMNS = {
+  id: users.id,
+  name: users.name,
+  lastName: users.lastName,
+  email: users.email,
+  company: users.company,
+  avatarUrl: users.avatarUrl,
+  addressLine1: users.addressLine1,
+  addressLine2: users.addressLine2,
+  addressCity: users.addressCity,
+  addressState: users.addressState,
+  addressPostalCode: users.addressPostalCode,
+  addressCountry: users.addressCountry,
+  isEmailVerified: users.isEmailVerified,
+  creditBalance: users.creditBalance,
+  createdAt: users.createdAt,
+};
+
 const REFRESH_COOKIE = "refreshToken";
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -224,17 +242,7 @@ export class AuthController {
   async me(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const [user] = await db
-        .select({
-          id: users.id,
-          name: users.name,
-          lastName: users.lastName,
-          email: users.email,
-          company: users.company,
-          avatarUrl: users.avatarUrl,
-          isEmailVerified: users.isEmailVerified,
-          creditBalance: users.creditBalance,
-          createdAt: users.createdAt,
-        })
+        .select(USER_PROFILE_COLUMNS)
         .from(users)
         .where(eq(users.id, req.user!.userId))
         .limit(1);
@@ -251,28 +259,34 @@ export class AuthController {
 
   async updateMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { name, lastname, company } = req.body;
+      const {
+        name,
+        lastname,
+        company,
+        addressLine1,
+        addressLine2,
+        addressCity,
+        addressState,
+        addressPostalCode,
+        addressCountry,
+      } = req.body;
 
       const updates: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name;
       if (lastname !== undefined) updates.lastName = lastname;
       if (company !== undefined) updates.company = company;
+      if (addressLine1 !== undefined) updates.addressLine1 = addressLine1;
+      if (addressLine2 !== undefined) updates.addressLine2 = addressLine2;
+      if (addressCity !== undefined) updates.addressCity = addressCity;
+      if (addressState !== undefined) updates.addressState = addressState;
+      if (addressPostalCode !== undefined) updates.addressPostalCode = addressPostalCode;
+      if (addressCountry !== undefined) updates.addressCountry = addressCountry;
 
       const [user] = await db
         .update(users)
         .set(updates)
         .where(eq(users.id, req.user!.userId))
-        .returning({
-          id: users.id,
-          name: users.name,
-          lastName: users.lastName,
-          email: users.email,
-          company: users.company,
-          avatarUrl: users.avatarUrl,
-          isEmailVerified: users.isEmailVerified,
-          creditBalance: users.creditBalance,
-          createdAt: users.createdAt,
-        });
+        .returning(USER_PROFILE_COLUMNS);
 
       return res.json({ user });
     } catch (err) {
@@ -299,19 +313,49 @@ export class AuthController {
         .update(users)
         .set({ avatarUrl, updatedAt: new Date() })
         .where(eq(users.id, req.user!.userId))
-        .returning({
-          id: users.id,
-          name: users.name,
-          lastName: users.lastName,
-          email: users.email,
-          company: users.company,
-          avatarUrl: users.avatarUrl,
-          isEmailVerified: users.isEmailVerified,
-          creditBalance: users.creditBalance,
-          createdAt: users.createdAt,
-        });
+        .returning(USER_PROFILE_COLUMNS);
 
       return res.json({ user });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async changePassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      const [user] = await db
+        .select({ id: users.id, passwordHash: users.passwordHash })
+        .from(users)
+        .where(eq(users.id, req.user!.userId))
+        .limit(1);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found." });
+      }
+
+      const isValidPassword = await verifyPassword(currentPassword, user.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Current password is incorrect." });
+      }
+
+      const passwordHash = await hashPassword(newPassword);
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(users)
+          .set({ passwordHash, updatedAt: new Date() })
+          .where(eq(users.id, user.id));
+
+        await tx
+          .update(refreshTokens)
+          .set({ isRevoked: true })
+          .where(eq(refreshTokens.userId, user.id));
+      });
+
+      res.clearCookie(REFRESH_COOKIE, REFRESH_COOKIE_OPTIONS);
+      return res.json({ message: "Password updated. Please sign in again." });
     } catch (err) {
       next(err);
     }
