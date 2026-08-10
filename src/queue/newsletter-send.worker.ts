@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { and, eq } from "drizzle-orm";
 import { db } from "../database/index.js";
-import { newsletters, contacts } from "../database/schema/schema.js";
+import { newsletters, contacts, users } from "../database/schema/schema.js";
 import { ResendEmailProvider } from "../shared/email/resend.provider.js";
 import { personalizeContent } from "../shared/newsletter/personalize.js";
 import { getRedisConnection } from "./redis-connection.js";
@@ -42,6 +42,15 @@ async function processJob(job: Job<NewsletterSendJobData>) {
     return;
   }
 
+  const [sender] = await db
+    .select({ name: users.name, lastName: users.lastName, company: users.company })
+    .from(users)
+    .where(eq(users.id, newsletter.userId))
+    .limit(1);
+
+  const senderName = sender ? `${sender.name} ${sender.lastName}`.trim() : undefined;
+  const sendDate = new Date().toLocaleDateString("pt-BR");
+
   const recipients = await db
     .select()
     .from(contacts)
@@ -56,8 +65,14 @@ async function processJob(job: Job<NewsletterSendJobData>) {
   for (const contact of recipients) {
     try {
       const unsubscribeUrl = unsubscribeUrlFor(contact.unsubscribeToken);
-      const personalizedContent = personalizeContent(newsletter.content, contact.name);
-      const personalizedSubject = personalizeContent(newsletter.title, contact.name);
+      const personalizationData = {
+        company: sender?.company,
+        contactName: contact.name,
+        date: sendDate,
+        senderName,
+      };
+      const personalizedContent = personalizeContent(newsletter.content, personalizationData);
+      const personalizedSubject = personalizeContent(newsletter.title, personalizationData);
       await emailProvider.send({
         to: contact.email,
         subject: personalizedSubject,
