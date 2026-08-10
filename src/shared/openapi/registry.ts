@@ -217,6 +217,19 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "delete",
+  path: "/api/newsletters/{id}",
+  tags: ["Newsletters"],
+  summary: "Remove uma newsletter",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    204: { description: "Newsletter removida" },
+    404: errorResponse("Newsletter nao encontrada"),
+  },
+});
+
+registry.registerPath({
   method: "post",
   path: "/api/newsletters/{id}/generate",
   tags: ["Newsletters"],

@@ -94,7 +94,7 @@ async function processJob(job: Job<NewsletterSendJobData>) {
 
   await db
     .update(newsletters)
-    .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+    .set({ status: "sent", sentAt: new Date(), recipientCount: sent, updatedAt: new Date() })
     .where(eq(newsletters.id, newsletterId));
 
   logger.info({ newsletterId, userId, sent, failed }, "Newsletter send finished");

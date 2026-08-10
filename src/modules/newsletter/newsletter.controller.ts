@@ -197,4 +197,26 @@ export class NewsletterController {
       next(err);
     }
   }
+
+  async remove(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedId = idParamSchema.safeParse(req.params.id);
+      if (!parsedId.success) {
+        return res.status(400).json({ error: "Invalid newsletter id." });
+      }
+
+      const [deleted] = await db
+        .delete(newsletters)
+        .where(and(eq(newsletters.id, parsedId.data), eq(newsletters.userId, req.user!.userId)))
+        .returning({ id: newsletters.id });
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Newsletter not found." });
+      }
+
+      return res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  }
 }
