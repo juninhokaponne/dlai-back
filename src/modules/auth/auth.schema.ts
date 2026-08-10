@@ -32,4 +32,10 @@ export const registerSchema = z.object({
   company: z.string().max(32).optional(),
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().trim().nonempty().max(255).optional(),
+  lastname: z.string().trim().nonempty().max(255).optional(),
+  company: z.string().trim().max(32).optional(),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;

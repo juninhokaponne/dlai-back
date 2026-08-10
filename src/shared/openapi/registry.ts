@@ -1,6 +1,6 @@
 import { extendZodWithOpenApi, OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
-import { loginSchema, registerSchema } from "../../modules/auth/auth.schema.js";
+import { loginSchema, registerSchema, updateProfileSchema } from "../../modules/auth/auth.schema.js";
 import {
   createNewsletterSchema,
   generateSchema,
@@ -111,6 +111,19 @@ registry.registerPath({
   security: bearerAuth,
   responses: {
     200: { description: "Dados do usuario", content: { "application/json": { schema: z.object({ user: z.object({}) } ) } } },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/auth/me",
+  tags: ["Auth"],
+  summary: "Atualiza nome, sobrenome e/ou empresa do usuario autenticado",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: updateProfileSchema } } } },
+  responses: {
+    200: { description: "Perfil atualizado", content: { "application/json": { schema: z.object({ user: z.object({}) } ) } } },
     401: errorResponse("Nao autenticado"),
   },
 });

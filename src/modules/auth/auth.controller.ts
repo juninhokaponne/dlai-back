@@ -240,4 +240,34 @@ export class AuthController {
       next(err);
     }
   }
+
+  async updateMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { name, lastname, company } = req.body;
+
+      const updates: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
+      if (name !== undefined) updates.name = name;
+      if (lastname !== undefined) updates.lastName = lastname;
+      if (company !== undefined) updates.company = company;
+
+      const [user] = await db
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, req.user!.userId))
+        .returning({
+          id: users.id,
+          name: users.name,
+          lastName: users.lastName,
+          email: users.email,
+          company: users.company,
+          isEmailVerified: users.isEmailVerified,
+          creditBalance: users.creditBalance,
+          createdAt: users.createdAt,
+        });
+
+      return res.json({ user });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
