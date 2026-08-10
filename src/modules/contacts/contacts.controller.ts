@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { parse } from "csv-parse/sync";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
 import { contacts } from "../../database/schema/schema.js";
@@ -16,16 +16,27 @@ export class ContactsController {
     try {
       const limit = Math.min(Number(req.query.limit) || 100, 500);
       const offset = Math.max(Number(req.query.offset) || 0, 0);
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
 
-      const rows = await db
-        .select()
-        .from(contacts)
-        .where(eq(contacts.userId, req.user!.userId))
-        .orderBy(desc(contacts.createdAt))
-        .limit(limit)
-        .offset(offset);
+      const whereClause = search
+        ? and(
+            eq(contacts.userId, req.user!.userId),
+            or(ilike(contacts.email, `%${search}%`), ilike(contacts.name, `%${search}%`)),
+          )
+        : eq(contacts.userId, req.user!.userId);
 
-      return res.json({ contacts: rows });
+      const [rows, total] = await Promise.all([
+        db
+          .select()
+          .from(contacts)
+          .where(whereClause)
+          .orderBy(desc(contacts.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.$count(contacts, whereClause),
+      ]);
+
+      return res.json({ contacts: rows, total, limit, offset });
     } catch (err) {
       next(err);
     }
