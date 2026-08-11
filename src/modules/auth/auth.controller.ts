@@ -469,15 +469,17 @@ export class AuthController {
   async resetPassword(req: Request, res: Response, next: NextFunction) {
     try {
       const { token, newPassword } = req.body;
-      const newPasswordHash = await hashPassword(newPassword);
 
-      const result = await confirmPasswordResetToken(token, newPasswordHash);
+      const result = await confirmPasswordResetToken(token, newPassword);
 
       if (result.status === "invalid") {
         return res.status(400).json({ error: "This reset link is invalid." });
       }
       if (result.status === "expired") {
         return res.status(400).json({ error: "This reset link has expired." });
+      }
+      if (result.status === "same_password") {
+        return res.status(400).json({ error: "New password must be different from your current password." });
       }
 
       sendPasswordChangedEmail({ email: result.email, locale: result.locale }).catch((err) =>

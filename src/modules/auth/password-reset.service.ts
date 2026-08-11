@@ -1,7 +1,13 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
 import { passwordResetTokens, refreshTokens, users } from "../../database/schema/schema.js";
-import { generateVerificationTokenRaw, hashToken, passwordResetTokenExpiry } from "../../shared/utils/security.js";
+import {
+  generateVerificationTokenRaw,
+  hashPassword,
+  hashToken,
+  passwordResetTokenExpiry,
+  verifyPassword,
+} from "../../shared/utils/security.js";
 import type { EmailLocale } from "../../shared/email/templates/copy.js";
 
 export async function createPasswordResetToken(userId: string): Promise<string> {
@@ -21,11 +27,12 @@ export async function createPasswordResetToken(userId: string): Promise<string> 
 export type ConfirmPasswordResetResult =
   | { status: "confirmed"; email: string; name: string; locale: EmailLocale }
   | { status: "invalid" }
-  | { status: "expired" };
+  | { status: "expired" }
+  | { status: "same_password" };
 
 export async function confirmPasswordResetToken(
   rawToken: string,
-  newPasswordHash: string,
+  newPassword: string,
 ): Promise<ConfirmPasswordResetResult> {
   const [stored] = await db
     .select()
@@ -43,7 +50,7 @@ export async function confirmPasswordResetToken(
   }
 
   const [user] = await db
-    .select({ email: users.email, name: users.name, locale: users.locale })
+    .select({ email: users.email, name: users.name, locale: users.locale, passwordHash: users.passwordHash })
     .from(users)
     .where(eq(users.id, stored.userId))
     .limit(1);
@@ -52,6 +59,13 @@ export async function confirmPasswordResetToken(
     await db.delete(passwordResetTokens).where(eq(passwordResetTokens.id, stored.id));
     return { status: "invalid" };
   }
+
+  const isSamePassword = await verifyPassword(newPassword, user.passwordHash);
+  if (isSamePassword) {
+    return { status: "same_password" };
+  }
+
+  const newPasswordHash = await hashPassword(newPassword);
 
   await db.transaction(async (tx) => {
     await tx
