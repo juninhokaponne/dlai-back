@@ -11,6 +11,21 @@ const MAX_ROWS = 20_000;
 const MAX_INVALID_SAMPLES = 20;
 const MAX_MANUAL_CONTACTS = 50;
 
+function detectDelimiter(buffer: Buffer): string {
+  const firstLine = buffer.toString("utf-8", 0, Math.min(buffer.length, 2000)).split(/\r?\n/)[0] ?? "";
+  const candidates = [",", ";", "\t"];
+  let best = ",";
+  let bestCount = 0;
+  for (const candidate of candidates) {
+    const count = firstLine.split(candidate).length - 1;
+    if (count > bestCount) {
+      best = candidate;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
 export class ContactsController {
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
@@ -89,6 +104,7 @@ export class ContactsController {
       try {
         records = parse(file.buffer, {
           columns: (header: string[]) => header.map((h) => h.trim().toLowerCase()),
+          delimiter: detectDelimiter(file.buffer),
           trim: true,
           skip_empty_lines: true,
         });
