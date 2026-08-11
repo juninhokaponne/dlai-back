@@ -14,7 +14,7 @@ import {
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
 import { workspaceGenerateSchema, workspaceTextActionSchema } from "../../modules/workspace/workspace.schema.js";
-import { contactRowSchema } from "../../modules/contacts/contact.schema.js";
+import { contactRowSchema, importTextSchema } from "../../modules/contacts/contact.schema.js";
 import { createTemplateSchema, generateTemplateSchema } from "../../modules/templates/template.schema.js";
 
 extendZodWithOpenApi(z);
@@ -357,6 +357,19 @@ registry.registerPath({
   responses: {
     201: { description: "Import processado", content: { "application/json": { schema: z.object({ imported: z.number(), skippedDuplicates: z.number(), invalidCount: z.number() }) } } },
     400: errorResponse("CSV ausente/invalido"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/contacts/import-text",
+  tags: ["Contacts"],
+  summary: "Importa contacts colados como texto (um por linha, com email obrigatorio e name opcional)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: importTextSchema } } } },
+  responses: {
+    201: { description: "Import processado", content: { "application/json": { schema: z.object({ imported: z.number(), skippedDuplicates: z.number(), invalidCount: z.number() }) } } },
+    400: errorResponse("Texto ausente/invalido"),
   },
 });
 

@@ -3,7 +3,7 @@ import multer from "multer";
 import { ContactsController } from "./contacts.controller.js";
 import { requireAuth } from "../../shared/middlewares/auth.js";
 import { validate } from "../../shared/middlewares/validate.js";
-import { contactRowSchema } from "./contact.schema.js";
+import { contactRowSchema, importTextSchema } from "./contact.schema.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -20,5 +20,6 @@ router.use(requireAuth);
 router.get("/", controller.list);
 router.post("/", validate(contactRowSchema), controller.create);
 router.post("/import", upload.single("file"), controller.import);
+router.post("/import-text", validate(importTextSchema), controller.importText);
 
 export { router as contactsRoutes };

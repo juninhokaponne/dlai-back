@@ -10,6 +10,7 @@ import { contactRowSchema } from "./contact.schema.js";
 const MAX_ROWS = 20_000;
 const MAX_INVALID_SAMPLES = 20;
 const MAX_MANUAL_CONTACTS = 50;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function detectDelimiter(buffer: Buffer): string {
   const firstLine = buffer.toString("utf-8", 0, Math.min(buffer.length, 2000)).split(/\r?\n/)[0] ?? "";
@@ -24,6 +25,25 @@ function detectDelimiter(buffer: Buffer): string {
     }
   }
   return best;
+}
+
+function parsePastedContactLine(line: string): Record<string, string> {
+  const parts = line
+    .split(/[,;\t]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 1) {
+    return { email: parts[0] ?? "" };
+  }
+
+  const emailPart = parts.find((part) => EMAIL_REGEX.test(part));
+  if (!emailPart) {
+    return { email: parts[0] ?? "" };
+  }
+
+  const namePart = parts.find((part) => part !== emailPart);
+  return { email: emailPart, ...(namePart ? { name: namePart } : {}) };
 }
 
 export class ContactsController {
@@ -93,6 +113,49 @@ export class ContactsController {
     }
   }
 
+  private extractValidRows(records: Record<string, string>[], rowNumberFor: (index: number) => number) {
+    const seen = new Set<string>();
+    const validRows: z.infer<typeof contactRowSchema>[] = [];
+    const invalidSamples: { row: number; error: string }[] = [];
+    let invalidCount = 0;
+
+    records.forEach((record, index) => {
+      const parsed = contactRowSchema.safeParse(record);
+      if (!parsed.success) {
+        invalidCount++;
+        if (invalidSamples.length < MAX_INVALID_SAMPLES) {
+          invalidSamples.push({
+            row: rowNumberFor(index),
+            error: parsed.error.issues[0]?.message ?? "Invalid row.",
+          });
+        }
+        return;
+      }
+
+      if (seen.has(parsed.data.email)) return;
+      seen.add(parsed.data.email);
+      validRows.push(parsed.data);
+    });
+
+    return { validRows, invalidCount, invalidSamples };
+  }
+
+  private async insertContacts(userId: string, validRows: z.infer<typeof contactRowSchema>[]) {
+    return db
+      .insert(contacts)
+      .values(
+        validRows.map((row) => ({
+          email: row.email,
+          userId,
+          ...(row.name !== undefined ? { name: row.name } : {}),
+        })),
+      )
+      .onConflictDoNothing({
+        target: [contacts.userId, contacts.email],
+      })
+      .returning({ id: contacts.id });
+  }
+
   async import(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const file = req.file;
@@ -121,28 +184,7 @@ export class ContactsController {
           .json({ error: `CSV has too many rows (max ${MAX_ROWS}).` });
       }
 
-      const seen = new Set<string>();
-      const validRows: z.infer<typeof contactRowSchema>[] = [];
-      const invalidSamples: { row: number; error: string }[] = [];
-      let invalidCount = 0;
-
-      records.forEach((record, index) => {
-        const parsed = contactRowSchema.safeParse(record);
-        if (!parsed.success) {
-          invalidCount++;
-          if (invalidSamples.length < MAX_INVALID_SAMPLES) {
-            invalidSamples.push({
-              row: index + 2,
-              error: parsed.error.issues[0]?.message ?? "Invalid row.",
-            });
-          }
-          return;
-        }
-
-        if (seen.has(parsed.data.email)) return;
-        seen.add(parsed.data.email);
-        validRows.push(parsed.data);
-      });
+      const { validRows, invalidCount, invalidSamples } = this.extractValidRows(records, (index) => index + 2);
 
       if (validRows.length === 0) {
         return res.status(400).json({
@@ -152,19 +194,47 @@ export class ContactsController {
         });
       }
 
-      const inserted = await db
-        .insert(contacts)
-        .values(
-          validRows.map((row) => ({
-            email: row.email,
-            userId: req.user!.userId,
-            ...(row.name !== undefined ? { name: row.name } : {}),
-          })),
-        )
-        .onConflictDoNothing({
-          target: [contacts.userId, contacts.email],
-        })
-        .returning({ id: contacts.id });
+      const inserted = await this.insertContacts(req.user!.userId, validRows);
+
+      return res.status(201).json({
+        imported: inserted.length,
+        skippedDuplicates: validRows.length - inserted.length,
+        invalidCount,
+        invalidSamples,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async importText(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { text } = req.body as { text: string };
+
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+      if (lines.length === 0) {
+        return res.status(400).json({ error: "Paste at least one contact." });
+      }
+      if (lines.length > MAX_ROWS) {
+        return res.status(400).json({ error: `Too many contacts (max ${MAX_ROWS}).` });
+      }
+
+      const records = lines.map(parsePastedContactLine);
+      const { validRows, invalidCount, invalidSamples } = this.extractValidRows(records, (index) => index + 1);
+
+      if (validRows.length === 0) {
+        return res.status(400).json({
+          error: "No valid contacts found.",
+          invalidCount,
+          invalidSamples,
+        });
+      }
+
+      const inserted = await this.insertContacts(req.user!.userId, validRows);
 
       return res.status(201).json({
         imported: inserted.length,
