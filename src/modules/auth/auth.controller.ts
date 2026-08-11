@@ -18,7 +18,9 @@ import {
   verifyPassword,
 } from "../../shared/utils/security.js";
 import { confirmVerificationToken, createVerificationToken } from "./email-verification.service.js";
+import { confirmPasswordResetToken, createPasswordResetToken } from "./password-reset.service.js";
 import { sendWelcomeVerificationEmail } from "../../shared/email/send-welcome-email.js";
+import { sendPasswordChangedEmail, sendPasswordResetEmail } from "../../shared/email/send-password-emails.js";
 import type { EmailLocale } from "../../shared/email/templates/copy.js";
 import { createLogger } from "../../shared/logger/logger.js";
 
@@ -434,6 +436,55 @@ export class AuthController {
       });
 
       return res.json({ message: "Verification email sent." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+
+      const [user] = await db
+        .select({ id: users.id, locale: users.locale })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (user) {
+        const token = await createPasswordResetToken(user.id);
+        sendPasswordResetEmail({ email, locale: user.locale as EmailLocale, resetToken: token }).catch((err) =>
+          logger.error({ err }, "Failed to queue password reset email"),
+        );
+      }
+
+      // Always the same response, whether or not the email exists, so this
+      // endpoint can't be used to enumerate registered accounts.
+      return res.json({ message: "If that email exists, we've sent a password reset link." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token, newPassword } = req.body;
+      const newPasswordHash = await hashPassword(newPassword);
+
+      const result = await confirmPasswordResetToken(token, newPasswordHash);
+
+      if (result.status === "invalid") {
+        return res.status(400).json({ error: "This reset link is invalid." });
+      }
+      if (result.status === "expired") {
+        return res.status(400).json({ error: "This reset link has expired." });
+      }
+
+      sendPasswordChangedEmail({ email: result.email, locale: result.locale }).catch((err) =>
+        logger.error({ err }, "Failed to queue password-changed email"),
+      );
+
+      return res.json({ message: "Password reset. Please sign in with your new password." });
     } catch (err) {
       next(err);
     }

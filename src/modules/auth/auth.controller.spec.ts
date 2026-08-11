@@ -28,6 +28,16 @@ jest.unstable_mockModule("../../shared/email/send-welcome-email.js", () => ({
   sendWelcomeVerificationEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.unstable_mockModule("./password-reset.service.js", () => ({
+  createPasswordResetToken: jest.fn().mockResolvedValue("mock-reset-token"),
+  confirmPasswordResetToken: jest.fn(),
+}));
+
+jest.unstable_mockModule("../../shared/email/send-password-emails.js", () => ({
+  sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+  sendPasswordChangedEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { AuthController } = await import("./auth.controller.js");
 const { db } = await import("../../database/index.js");
 

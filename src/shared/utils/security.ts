@@ -10,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev-only-insecure-secret";
 const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const EMAIL_VERIFICATION_TTL_HOURS = 48;
+const PASSWORD_RESET_TTL_HOURS = 1;
 
 export async function hashPassword(password: string): Promise<string> {
   return await hash(password, {
@@ -62,5 +63,11 @@ export function generateVerificationTokenRaw(): string {
 export function verificationTokenExpiry(): Date {
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + EMAIL_VERIFICATION_TTL_HOURS);
+  return expiresAt;
+}
+
+export function passwordResetTokenExpiry(): Date {
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + PASSWORD_RESET_TTL_HOURS);
   return expiresAt;
 }

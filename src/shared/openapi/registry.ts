@@ -2,8 +2,10 @@ import { extendZodWithOpenApi, OpenAPIRegistry } from "@asteasolutions/zod-to-op
 import { z } from "zod";
 import {
   changePasswordSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordSchema,
   updateProfileSchema,
   verifyEmailSchema,
 } from "../../modules/auth/auth.schema.js";
@@ -182,6 +184,29 @@ registry.registerPath({
   responses: {
     200: { description: "Email de verificacao reenviado", content: { "application/json": { schema: z.object({ message: z.string() }) } } },
     401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/forgot-password",
+  tags: ["Auth"],
+  summary: "Envia um email de redefinicao de senha se o email existir (resposta identica em ambos os casos)",
+  request: { body: { content: { "application/json": { schema: forgotPasswordSchema } } } },
+  responses: {
+    200: { description: "Resposta generica", content: { "application/json": { schema: z.object({ message: z.string() }) } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/reset-password",
+  tags: ["Auth"],
+  summary: "Redefine a senha a partir do token enviado por email",
+  request: { body: { content: { "application/json": { schema: resetPasswordSchema } } } },
+  responses: {
+    200: { description: "Senha redefinida", content: { "application/json": { schema: z.object({ message: z.string() }) } } },
+    400: errorResponse("Token invalido ou expirado"),
   },
 });
 

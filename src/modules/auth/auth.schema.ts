@@ -56,4 +56,18 @@ export const verifyEmailSchema = z.object({
   token: z.string().nonempty(),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .email("Please enter a valid email address.")
+    .trim()
+    .nonempty()
+    .toLowerCase(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().nonempty(),
+  newPassword: strongPasswordSchema,
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;

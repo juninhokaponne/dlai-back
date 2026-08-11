@@ -6,8 +6,10 @@ import { requireAuth } from "../../shared/middlewares/auth.js";
 import { authRateLimit } from "../../shared/middlewares/rate-limit.js";
 import {
   changePasswordSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordSchema,
   updateProfileSchema,
   verifyEmailSchema,
 } from "./auth.schema.js";
@@ -43,5 +45,7 @@ router.post(
 );
 router.post("/verify-email", authRateLimit(), validate(verifyEmailSchema), controller.verifyEmail);
 router.post("/resend-verification", authRateLimit(), requireAuth, controller.resendVerificationEmail);
+router.post("/forgot-password", authRateLimit(), validate(forgotPasswordSchema), controller.forgotPassword);
+router.post("/reset-password", authRateLimit(), validate(resetPasswordSchema), controller.resetPassword);
 
 export { router as authRoutes };
