@@ -21,20 +21,25 @@ export const MODEL_PRICING_USD: Record<string, ModelPricing> = {
 // default, trading credit cost for a different model. Each entry's
 // creditCost must comfortably cover its real cost vs GENERATION_CREDIT_COST
 // (the default) so premium picks never lose money, even in the worst case.
+// "tier" drives the user-facing quality label (translated client-side);
+// modelName is the technical name shown as secondary detail.
 export const BODY_MODEL_OPTIONS = [
   {
     model: AI_TASK_MODELS.body,
-    label: "Padrao (GPT-4.1 mini)",
+    tier: "light",
+    modelName: "GPT-4.1 mini",
     creditCost: 1,
   },
   {
     model: "google/gemini-2.5-flash",
-    label: "Gemini 2.5 Flash",
+    tier: "pro",
+    modelName: "Gemini 2.5 Flash",
     creditCost: 2,
   },
   {
     model: "anthropic/claude-haiku-4.5",
-    label: "Claude Haiku 4.5",
+    tier: "expert",
+    modelName: "Claude Haiku 4.5",
     creditCost: 3,
   },
 ] as const;
