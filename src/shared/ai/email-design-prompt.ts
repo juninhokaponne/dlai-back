@@ -20,5 +20,6 @@ Follow these professional design guidelines so the result looks beautiful, organ
 - The text must be specific and useful for the requested topic, never generic or filler
 ${imageInstruction}
 ${linkInstruction}
-- Do not include <html>, <head> or <body> tags - only the inner content.`;
+- Do not include <html>, <head> or <body> tags - only the inner content.
+- Output raw HTML only. Do not wrap it in a markdown code fence (no \`\`\` marks) and do not add any commentary before or after it.`;
 }

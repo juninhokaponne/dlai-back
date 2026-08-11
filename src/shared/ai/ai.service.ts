@@ -1,6 +1,7 @@
 import type { AIProvider } from "./ai-provider.interface.js";
 import { AI_TASK_MODELS, MODEL_PRICING_USD, type AITask } from "./ai.config.js";
 import { AIProviderError } from "./ai.errors.js";
+import { stripMarkdownCodeFence } from "./sanitize-ai-output.js";
 
 export interface RunTaskResult {
   content: string;
@@ -27,6 +28,6 @@ export class AIService {
         result.usage.completionTokens * pricing.completionPerMillion) /
       1_000_000;
 
-    return { content: result.content, model, costUsd, usage: result.usage };
+    return { content: stripMarkdownCodeFence(result.content), model, costUsd, usage: result.usage };
   }
 }
