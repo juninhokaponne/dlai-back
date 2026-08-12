@@ -24,8 +24,8 @@ for (const key of PLAN_KEYS) {
 
   const price = await stripe.prices.create({
     product: product.id,
-    unit_amount: plan.priceUsdCents,
-    currency: "usd",
+    unit_amount: plan.priceBrlCents,
+    currency: "brl",
     recurring: { interval: "month" },
     lookup_key: plan.stripeLookupKey,
   });
