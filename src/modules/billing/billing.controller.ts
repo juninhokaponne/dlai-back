@@ -15,7 +15,7 @@ export class BillingController {
       const plans = PLAN_KEYS.map((key) => ({
         key,
         name: PLANS[key].name,
-        priceUsdCents: PLANS[key].priceUsdCents,
+        priceBrlCents: PLANS[key].priceBrlCents,
         credits: PLANS[key].credits,
       }));
 
@@ -45,6 +45,10 @@ export class BillingController {
         success_url: `${FRONTEND_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${FRONTEND_URL}/billing/cancel`,
         metadata: { userId: req.user!.userId, plan: req.body.plan },
+        // Prices are set in BRL; adaptive_pricing lets Stripe show a localized
+        // estimate to customers paying with a non-BRL card without us having
+        // to maintain per-currency prices.
+        adaptive_pricing: { enabled: true },
       });
 
       return res.status(201).json({ url: session.url });
