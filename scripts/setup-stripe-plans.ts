@@ -18,7 +18,7 @@ for (const key of PLAN_KEYS) {
   }
 
   const product = await stripe.products.create({
-    name: `dlai-back ${plan.name}`,
+    name: `LetterGo AI ${plan.name}`,
     metadata: { plan: key, credits: String(plan.credits) },
   });
 
