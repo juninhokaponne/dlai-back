@@ -22,6 +22,8 @@ export const PLANS = {
   },
 } as const;
 
+export const TRIAL_PERIOD_DAYS = 14;
+
 export type PlanKey = keyof typeof PLANS;
 
 export const PLAN_KEYS = Object.keys(PLANS) as PlanKey[];

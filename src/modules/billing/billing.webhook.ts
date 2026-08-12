@@ -72,6 +72,32 @@ async function syncSubscription(subscription: Stripe.Subscription) {
     });
 }
 
+async function grantTrialCredits(subscription: Stripe.Subscription, eventId: string) {
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer.id;
+
+  const userId = await findUserIdByCustomerId(customerId);
+  if (!userId) {
+    logger.error({ customerId }, "No user found for Stripe customer");
+    return;
+  }
+
+  const item = subscription.items.data[0];
+  if (!item) return;
+
+  const plan = findPlanByPriceId(item.price.id);
+  if (!plan) {
+    logger.error({ priceId: item.price.id }, "No matching plan for Stripe price");
+    return;
+  }
+
+  await creditCredits(userId, plan.credits, "subscription_grant", {
+    stripeEventId: eventId,
+  });
+}
+
 async function markSubscriptionCanceled(subscription: Stripe.Subscription) {
   await db
     .update(subscriptions)
@@ -146,7 +172,14 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
   try {
     switch (event.type) {
-      case "customer.subscription.created":
+      case "customer.subscription.created": {
+        const subscription = event.data.object;
+        await syncSubscription(subscription);
+        if (subscription.status === "trialing") {
+          await grantTrialCredits(subscription, event.id);
+        }
+        break;
+      }
       case "customer.subscription.updated":
         await syncSubscription(event.data.object);
         break;

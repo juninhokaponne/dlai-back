@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
 import { subscriptions } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
-import { PLANS, PLAN_KEYS, type PlanKey } from "../../shared/billing/plans.config.js";
+import { PLANS, PLAN_KEYS, TRIAL_PERIOD_DAYS, type PlanKey } from "../../shared/billing/plans.config.js";
 import { getStripeClient } from "../../shared/billing/stripe-client.js";
 import { getOrCreateStripeCustomerId } from "../../shared/billing/stripe-customer.js";
 
@@ -38,6 +38,14 @@ export class BillingController {
       const customerId = await getOrCreateStripeCustomerId(req.user!.userId);
       const stripe = getStripeClient();
 
+      // Only first-time subscribers get a trial, so canceling and
+      // resubscribing doesn't grant a fresh trial every time.
+      const [previousSubscription] = await db
+        .select({ id: subscriptions.id })
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, req.user!.userId))
+        .limit(1);
+
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer: customerId,
@@ -49,6 +57,9 @@ export class BillingController {
         // estimate to customers paying with a non-BRL card without us having
         // to maintain per-currency prices.
         adaptive_pricing: { enabled: true },
+        ...(previousSubscription
+          ? {}
+          : { subscription_data: { trial_period_days: TRIAL_PERIOD_DAYS } }),
       });
 
       return res.status(201).json({ url: session.url });
