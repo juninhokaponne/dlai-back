@@ -4,6 +4,8 @@ import { db } from "../../database/index.js";
 import { subscriptions } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { PLANS, PLAN_KEYS, TRIAL_PERIOD_DAYS, type PlanKey } from "../../shared/billing/plans.config.js";
+import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
+import { getCreditsUsedThisCycle } from "../../shared/billing/credits.service.js";
 import { getStripeClient } from "../../shared/billing/stripe-client.js";
 import { getOrCreateStripeCustomerId } from "../../shared/billing/stripe-customer.js";
 
@@ -19,7 +21,7 @@ export class BillingController {
         credits: PLANS[key].credits,
       }));
 
-      return res.json({ plans });
+      return res.json({ plans, trialPeriodDays: TRIAL_PERIOD_DAYS });
     } catch (err) {
       next(err);
     }
@@ -70,17 +72,31 @@ export class BillingController {
 
   async getSubscription(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      const userId = req.user!.userId;
+
       const [subscription] = await db
         .select({
           plan: subscriptions.plan,
           status: subscriptions.status,
           currentPeriodEnd: subscriptions.currentPeriodEnd,
+          cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
         })
         .from(subscriptions)
-        .where(eq(subscriptions.userId, req.user!.userId))
+        .where(eq(subscriptions.userId, userId))
         .limit(1);
 
-      return res.json({ subscription: subscription ?? null });
+      const planCredits =
+        subscription && (PLAN_KEYS as readonly string[]).includes(subscription.plan)
+          ? PLANS[subscription.plan as PlanKey].credits
+          : TRIAL_CREDITS;
+
+      const creditsUsedThisCycle = await getCreditsUsedThisCycle(userId);
+
+      return res.json({
+        subscription: subscription ?? null,
+        planCredits,
+        creditsUsedThisCycle,
+      });
     } catch (err) {
       next(err);
     }

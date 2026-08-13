@@ -420,7 +420,16 @@ registry.registerPath({
   path: "/api/billing/plans",
   tags: ["Billing"],
   summary: "Lista os planos disponiveis",
-  responses: { 200: { description: "Planos", content: { "application/json": { schema: z.object({ plans: z.array(z.object({})) }) } } } },
+  responses: {
+    200: {
+      description: "Planos",
+      content: {
+        "application/json": {
+          schema: z.object({ plans: z.array(z.object({})), trialPeriodDays: z.number() }),
+        },
+      },
+    },
+  },
 });
 
 registry.registerPath({
@@ -443,7 +452,18 @@ registry.registerPath({
   summary: "Assinatura atual do usuario autenticado (null se nunca assinou)",
   security: bearerAuth,
   responses: {
-    200: { description: "Assinatura atual", content: { "application/json": { schema: z.object({ subscription: z.object({}).nullable() }) } } },
+    200: {
+      description: "Assinatura atual",
+      content: {
+        "application/json": {
+          schema: z.object({
+            subscription: z.object({}).nullable(),
+            planCredits: z.number(),
+            creditsUsedThisCycle: z.number(),
+          }),
+        },
+      },
+    },
     401: errorResponse("Nao autenticado"),
   },
 });
