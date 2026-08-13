@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../../database/index.js";
 import {
   users,
@@ -60,4 +60,33 @@ export async function creditCredits(
 
     return updated!.creditBalance;
   });
+}
+
+export async function getCreditsUsedThisCycle(userId: string): Promise<number> {
+  const [lastGrant] = await db
+    .select({ createdAt: creditTransactions.createdAt })
+    .from(creditTransactions)
+    .where(
+      and(
+        eq(creditTransactions.userId, userId),
+        inArray(creditTransactions.reason, ["subscription_grant", "trial_grant"]),
+      ),
+    )
+    .orderBy(desc(creditTransactions.createdAt))
+    .limit(1);
+
+  const cycleStart = lastGrant?.createdAt ?? new Date(0);
+
+  const [usage] = await db
+    .select({ total: sql<string>`coalesce(sum(${creditTransactions.amount}), 0)` })
+    .from(creditTransactions)
+    .where(
+      and(
+        eq(creditTransactions.userId, userId),
+        inArray(creditTransactions.reason, ["generation_debit", "generation_refund"]),
+        gte(creditTransactions.createdAt, cycleStart),
+      ),
+    );
+
+  return Math.max(0, -Number(usage?.total ?? 0));
 }
