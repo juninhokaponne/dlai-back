@@ -60,6 +60,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
     status: toSubscriptionStatus(subscription.status),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodEnd: new Date(item.current_period_end * 1000),
   };
 

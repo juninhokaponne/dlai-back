@@ -250,6 +250,7 @@ export const subscriptions = pgTable("subscriptions", {
     .unique(),
   stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull(),
   status: subscriptionStatus("status").notNull(),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
   currentPeriodEnd: timestamp("current_period_end").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
