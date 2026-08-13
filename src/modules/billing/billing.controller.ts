@@ -8,6 +8,7 @@ import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
 import { getCreditsUsedThisCycle } from "../../shared/billing/credits.service.js";
 import { getStripeClient } from "../../shared/billing/stripe-client.js";
 import { getOrCreateStripeCustomerId } from "../../shared/billing/stripe-customer.js";
+import { SubscriptionNotFoundError } from "../../shared/billing/billing.errors.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:3000";
 
@@ -129,6 +130,45 @@ export class BillingController {
       }));
 
       return res.json({ invoices });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async cancelSubscription(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+
+      const [subscription] = await db
+        .select({
+          id: subscriptions.id,
+          stripeSubscriptionId: subscriptions.stripeSubscriptionId,
+          status: subscriptions.status,
+        })
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, userId))
+        .limit(1);
+
+      if (!subscription || subscription.status === "canceled") {
+        throw new SubscriptionNotFoundError();
+      }
+
+      const stripe = getStripeClient();
+      const updated = await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+
+      await db
+        .update(subscriptions)
+        .set({ cancelAtPeriodEnd: true, updatedAt: new Date() })
+        .where(eq(subscriptions.id, subscription.id));
+
+      const item = updated.items.data[0];
+
+      return res.json({
+        cancelAtPeriodEnd: updated.cancel_at_period_end,
+        currentPeriodEnd: item ? new Date(item.current_period_end * 1000).toISOString() : null,
+      });
     } catch (err) {
       next(err);
     }

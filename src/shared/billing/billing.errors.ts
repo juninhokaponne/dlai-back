@@ -6,3 +6,12 @@ export class InsufficientCreditsError extends Error {
     this.name = "InsufficientCreditsError";
   }
 }
+
+export class SubscriptionNotFoundError extends Error {
+  statusCode = 404;
+
+  constructor(message = "No active subscription to cancel.") {
+    super(message);
+    this.name = "SubscriptionNotFoundError";
+  }
+}

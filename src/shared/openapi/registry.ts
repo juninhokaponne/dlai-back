@@ -480,6 +480,26 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "post",
+  path: "/api/billing/cancel",
+  tags: ["Billing"],
+  summary: "Cancela a assinatura ao final do periodo ja pago",
+  security: bearerAuth,
+  responses: {
+    200: {
+      description: "Assinatura marcada para cancelar",
+      content: {
+        "application/json": {
+          schema: z.object({ cancelAtPeriodEnd: z.boolean(), currentPeriodEnd: z.string().nullable() }),
+        },
+      },
+    },
+    401: errorResponse("Nao autenticado"),
+    404: errorResponse("Nenhuma assinatura ativa para cancelar"),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Workspace
 // ---------------------------------------------------------------------------
