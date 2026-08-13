@@ -1,7 +1,7 @@
 import type { NextFunction, Response } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
-import { subscriptions } from "../../database/schema/schema.js";
+import { subscriptions, users } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { PLANS, PLAN_KEYS, TRIAL_PERIOD_DAYS, type PlanKey } from "../../shared/billing/plans.config.js";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
@@ -97,6 +97,38 @@ export class BillingController {
         planCredits,
         creditsUsedThisCycle,
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async listInvoices(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const [user] = await db
+        .select({ stripeCustomerId: users.stripeCustomerId })
+        .from(users)
+        .where(eq(users.id, req.user!.userId))
+        .limit(1);
+
+      if (!user?.stripeCustomerId) {
+        return res.json({ invoices: [] });
+      }
+
+      const stripe = getStripeClient();
+      const result = await stripe.invoices.list({
+        customer: user.stripeCustomerId,
+        limit: 12,
+      });
+
+      const invoices = result.data.map((invoice) => ({
+        id: invoice.id,
+        amountBrlCents: invoice.amount_paid,
+        status: invoice.status,
+        createdAt: new Date(invoice.created * 1000).toISOString(),
+        hostedInvoiceUrl: invoice.hosted_invoice_url,
+      }));
+
+      return res.json({ invoices });
     } catch (err) {
       next(err);
     }
