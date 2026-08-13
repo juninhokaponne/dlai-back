@@ -102,7 +102,7 @@ async function grantTrialCredits(subscription: Stripe.Subscription, eventId: str
 async function markSubscriptionCanceled(subscription: Stripe.Subscription) {
   await db
     .update(subscriptions)
-    .set({ status: "canceled", updatedAt: new Date() })
+    .set({ status: "canceled", cancelAtPeriodEnd: false, updatedAt: new Date() })
     .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
 }
 

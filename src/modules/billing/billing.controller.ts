@@ -9,6 +9,10 @@ import { getCreditsUsedThisCycle } from "../../shared/billing/credits.service.js
 import { getStripeClient } from "../../shared/billing/stripe-client.js";
 import { getOrCreateStripeCustomerId } from "../../shared/billing/stripe-customer.js";
 import { SubscriptionNotFoundError } from "../../shared/billing/billing.errors.js";
+import type Stripe from "stripe";
+import { createLogger } from "../../shared/logger/logger.js";
+
+const logger = createLogger("billing.controller");
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:3000";
 
@@ -87,7 +91,9 @@ export class BillingController {
         .limit(1);
 
       const planCredits =
-        subscription && (PLAN_KEYS as readonly string[]).includes(subscription.plan)
+        subscription &&
+        subscription.status !== "canceled" &&
+        (PLAN_KEYS as readonly string[]).includes(subscription.plan)
           ? PLANS[subscription.plan as PlanKey].credits
           : TRIAL_CREDITS;
 
@@ -116,17 +122,24 @@ export class BillingController {
       }
 
       const stripe = getStripeClient();
-      const result = await stripe.invoices.list({
-        customer: user.stripeCustomerId,
-        limit: 12,
-      });
+      let result: Stripe.Response<Stripe.ApiList<Stripe.Invoice>>;
+      try {
+        result = await stripe.invoices.list({
+          customer: user.stripeCustomerId,
+          limit: 12,
+        });
+      } catch (err) {
+        logger.error({ err, userId: req.user!.userId }, "Stripe invoices.list failed");
+        return res.status(502).json({ error: "Unable to load invoices right now." });
+      }
 
       const invoices = result.data.map((invoice) => ({
         id: invoice.id,
         amountBrlCents: invoice.amount_paid,
+        currency: invoice.currency,
         status: invoice.status,
         createdAt: new Date(invoice.created * 1000).toISOString(),
-        hostedInvoiceUrl: invoice.hosted_invoice_url,
+        hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
       }));
 
       return res.json({ invoices });
@@ -154,9 +167,18 @@ export class BillingController {
       }
 
       const stripe = getStripeClient();
-      const updated = await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-        cancel_at_period_end: true,
-      });
+      let updated: Stripe.Response<Stripe.Subscription>;
+      try {
+        updated = await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+          cancel_at_period_end: true,
+        });
+      } catch (err) {
+        logger.error(
+          { err, stripeSubscriptionId: subscription.stripeSubscriptionId },
+          "Stripe subscriptions.update failed",
+        );
+        return res.status(502).json({ error: "Unable to cancel subscription right now." });
+      }
 
       await db
         .update(subscriptions)
