@@ -12,6 +12,7 @@ import {
   type NewsletterGenerateJobData,
 } from "./newsletter-generate.queue.js";
 import { creditCredits } from "../shared/billing/credits.service.js";
+import { createNotification } from "../shared/notifications/notifications.service.js";
 import { createLogger } from "../shared/logger/logger.js";
 
 const logger = createLogger("newsletter-generate.worker");
@@ -66,6 +67,8 @@ ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
     .where(eq(newsletters.id, newsletterId));
 
   logger.info({ newsletterId, userId, costUsd: totalCost }, "Newsletter generated");
+
+  await createNotification({ userId, type: "newsletter_generated", newsletterId });
 }
 
 export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobData> {
@@ -95,6 +98,12 @@ export function startNewsletterGenerateWorker(): Worker<NewsletterGenerateJobDat
       .where(eq(newsletters.id, job.data.newsletterId));
 
     await creditCredits(job.data.userId, job.data.creditCost, "generation_refund", {
+      newsletterId: job.data.newsletterId,
+    });
+
+    await createNotification({
+      userId: job.data.userId,
+      type: "newsletter_generation_failed",
       newsletterId: job.data.newsletterId,
     });
   });

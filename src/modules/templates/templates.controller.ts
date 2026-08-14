@@ -8,6 +8,7 @@ import { AIService } from "../../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../../shared/ai/openrouter.provider.js";
 import { buildEmailDesignInstructions } from "../../shared/ai/email-design-prompt.js";
 import { MATCH_INPUT_LANGUAGE_INSTRUCTION } from "../../shared/ai/language-instruction.js";
+import { createNotification } from "../../shared/notifications/notifications.service.js";
 
 const aiService = new AIService(new OpenRouterProvider());
 const idParamSchema = z.string().uuid();
@@ -129,6 +130,12 @@ ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`;
           status: "ready",
         })
         .returning();
+
+      await createNotification({
+        userId: req.user!.userId,
+        type: "newsletter_generated",
+        newsletterId: newsletter!.id,
+      });
 
       return res.status(201).json({ newsletter });
     } catch (err) {

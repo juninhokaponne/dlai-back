@@ -9,6 +9,7 @@ import {
   NEWSLETTER_SEND_QUEUE,
   type NewsletterSendJobData,
 } from "./newsletter-send.queue.js";
+import { createNotification } from "../shared/notifications/notifications.service.js";
 import { createLogger } from "../shared/logger/logger.js";
 
 const logger = createLogger("newsletter-send.worker");
@@ -102,6 +103,8 @@ async function processJob(job: Job<NewsletterSendJobData>) {
     .where(eq(newsletters.id, newsletterId));
 
   logger.info({ newsletterId, userId, sent, failed }, "Newsletter send finished");
+
+  await createNotification({ userId, type: "newsletter_sent", newsletterId });
 }
 
 export function startNewsletterSendWorker(): Worker<NewsletterSendJobData> {
@@ -125,6 +128,12 @@ export function startNewsletterSendWorker(): Worker<NewsletterSendJobData> {
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, job.data.newsletterId));
+
+    await createNotification({
+      userId: job.data.userId,
+      type: "newsletter_send_failed",
+      newsletterId: job.data.newsletterId,
+    });
   });
 
   return worker;

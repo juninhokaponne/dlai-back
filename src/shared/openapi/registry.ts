@@ -664,3 +664,51 @@ registry.registerPath({
     401: errorResponse("Nao autenticado"),
   },
 });
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/notifications",
+  tags: ["Notifications"],
+  summary: "Lista as ultimas notificacoes do usuario e se o lembrete de confirmar email esta pendente",
+  security: bearerAuth,
+  responses: {
+    200: {
+      description: "Notificacoes",
+      content: {
+        "application/json": {
+          schema: z.object({ notifications: z.array(z.object({})), emailVerificationPending: z.boolean() }),
+        },
+      },
+    },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/notifications/{id}/read",
+  tags: ["Notifications"],
+  summary: "Marca uma notificacao como lida",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    204: { description: "Marcada como lida" },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/notifications/read-all",
+  tags: ["Notifications"],
+  summary: "Marca todas as notificacoes do usuario como lidas",
+  security: bearerAuth,
+  responses: {
+    204: { description: "Todas marcadas como lidas" },
+    401: errorResponse("Nao autenticado"),
+  },
+});
