@@ -47,6 +47,7 @@ const USER_PROFILE_COLUMNS = {
   addressCountry: users.addressCountry,
   newsletterViewMode: users.newsletterViewMode,
   locale: users.locale,
+  timezone: users.timezone,
   isEmailVerified: users.isEmailVerified,
   creditBalance: users.creditBalance,
   createdAt: users.createdAt,
@@ -293,6 +294,7 @@ export class AuthController {
         addressCountry,
         newsletterViewMode,
         locale,
+        timezone,
       } = req.body;
 
       const updates: Partial<typeof users.$inferInsert> = { updatedAt: new Date() };
@@ -307,6 +309,7 @@ export class AuthController {
       if (addressCountry !== undefined) updates.addressCountry = addressCountry;
       if (newsletterViewMode !== undefined) updates.newsletterViewMode = newsletterViewMode;
       if (locale !== undefined) updates.locale = locale;
+      if (timezone !== undefined) updates.timezone = timezone;
 
       const [user] = await db
         .update(users)
