@@ -16,6 +16,13 @@ import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
 
 export const newsletterViewMode = pgEnum("newsletter_view_mode", ["list", "grid"]);
 export const userLocale = pgEnum("user_locale", ["en", "pt", "es"]);
+export const automationRunStatus = pgEnum("automation_run_status", ["running", "completed", "failed"]);
+export const automationRunContactStatus = pgEnum("automation_run_contact_status", [
+  "pending",
+  "waiting",
+  "completed",
+  "failed",
+]);
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -37,6 +44,7 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
   newsletterViewMode: newsletterViewMode("newsletter_view_mode").default("list").notNull(),
   locale: userLocale("locale").default("en").notNull(),
+  timezone: varchar("timezone", { length: 64 }).default("America/Sao_Paulo").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -231,6 +239,8 @@ export const notificationType = pgEnum("notification_type", [
   "newsletter_generation_failed",
   "newsletter_sent",
   "newsletter_send_failed",
+  "automation_paused_insufficient_credits",
+  "automation_run_failed",
 ]);
 
 export const notifications = pgTable("notifications", {
@@ -314,11 +324,91 @@ export const automations = pgTable("automations", {
   edges: jsonb("edges").default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  nextRunAt: timestamp("next_run_at"),
+  lastRunAt: timestamp("last_run_at"),
 });
 
 export const automationsRelations = relations(automations, ({ one }) => ({
   user: one(users, {
     fields: [automations.userId],
     references: [users.id],
+  }),
+}));
+
+export const automationRuns = pgTable("automation_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  automationId: uuid("automation_id")
+    .references(() => automations.id, { onDelete: "cascade" })
+    .notNull(),
+  newsletterId: uuid("newsletter_id").references(() => newsletters.id, { onDelete: "set null" }),
+  status: automationRunStatus("status").default("running").notNull(),
+  triggeredAt: timestamp("triggered_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const automationRunsRelations = relations(automationRuns, ({ one, many }) => ({
+  automation: one(automations, {
+    fields: [automationRuns.automationId],
+    references: [automations.id],
+  }),
+  newsletter: one(newsletters, {
+    fields: [automationRuns.newsletterId],
+    references: [newsletters.id],
+  }),
+  runContacts: many(automationRunContacts),
+}));
+
+export const automationRunContacts = pgTable("automation_run_contacts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  runId: uuid("run_id")
+    .references(() => automationRuns.id, { onDelete: "cascade" })
+    .notNull(),
+  automationId: uuid("automation_id")
+    .references(() => automations.id, { onDelete: "cascade" })
+    .notNull(),
+  contactId: uuid("contact_id")
+    .references(() => contacts.id, { onDelete: "cascade" })
+    .notNull(),
+  currentNodeId: varchar("current_node_id", { length: 255 }).notNull(),
+  status: automationRunContactStatus("status").default("pending").notNull(),
+  waitUntil: timestamp("wait_until"),
+  lastSendEventId: uuid("last_send_event_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const automationRunContactsRelations = relations(automationRunContacts, ({ one }) => ({
+  run: one(automationRuns, {
+    fields: [automationRunContacts.runId],
+    references: [automationRuns.id],
+  }),
+  contact: one(contacts, {
+    fields: [automationRunContacts.contactId],
+    references: [contacts.id],
+  }),
+}));
+
+export const automationSendEvents = pgTable("automation_send_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  runContactId: uuid("run_contact_id")
+    .references(() => automationRunContacts.id, { onDelete: "cascade" })
+    .notNull(),
+  contactId: uuid("contact_id")
+    .references(() => contacts.id, { onDelete: "cascade" })
+    .notNull(),
+  newsletterId: uuid("newsletter_id").references(() => newsletters.id, { onDelete: "set null" }),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+});
+
+export const automationSendEventsRelations = relations(automationSendEvents, ({ one }) => ({
+  runContact: one(automationRunContacts, {
+    fields: [automationSendEvents.runContactId],
+    references: [automationRunContacts.id],
+  }),
+  contact: one(contacts, {
+    fields: [automationSendEvents.contactId],
+    references: [contacts.id],
   }),
 }));
