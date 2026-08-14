@@ -411,6 +411,31 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/t/o/{sendEventId}",
+  tags: ["Tracking"],
+  summary: "Pixel publico de rastreamento de abertura (carregado pelo cliente de email)",
+  request: { params: z.object({ sendEventId: z.string() }) },
+  responses: {
+    200: { description: "Imagem PNG 1x1" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/t/c/{sendEventId}",
+  tags: ["Tracking"],
+  summary: "Redirecionador publico de rastreamento de clique (clicado a partir do email)",
+  request: {
+    params: z.object({ sendEventId: z.string().uuid() }),
+    query: z.object({ u: z.string() }),
+  },
+  responses: {
+    302: { description: "Redireciona para a URL real" },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Billing
 // ---------------------------------------------------------------------------
