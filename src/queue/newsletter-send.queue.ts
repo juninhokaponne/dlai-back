@@ -6,6 +6,8 @@ export const NEWSLETTER_SEND_QUEUE = "newsletter-send";
 export interface NewsletterSendJobData {
   newsletterId: string;
   userId: string;
+  contactId?: string;
+  trackingSendEventId?: string;
 }
 
 let queue: Queue<NewsletterSendJobData> | null = null;
