@@ -1,0 +1,117 @@
+import type { NextFunction, Response } from "express";
+import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "../../database/index.js";
+import { automations } from "../../database/schema/schema.js";
+import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
+
+const idParamSchema = z.string().uuid();
+
+export class AutomationsController {
+  async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const rows = await db
+        .select({
+          id: automations.id,
+          name: automations.name,
+          status: automations.status,
+          updatedAt: automations.updatedAt,
+        })
+        .from(automations)
+        .where(eq(automations.userId, req.user!.userId))
+        .orderBy(desc(automations.updatedAt));
+
+      return res.json({ automations: rows });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const name =
+        typeof req.body.name === "string" && req.body.name.trim()
+          ? req.body.name.trim()
+          : "Untitled automation";
+
+      const [automation] = await db
+        .insert(automations)
+        .values({ userId: req.user!.userId, name, status: "draft", nodes: [], edges: [] })
+        .returning();
+
+      return res.status(201).json({ automation });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async get(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedId = idParamSchema.safeParse(req.params.id);
+      if (!parsedId.success) {
+        return res.status(400).json({ error: "Invalid automation id." });
+      }
+
+      const [automation] = await db
+        .select()
+        .from(automations)
+        .where(and(eq(automations.id, parsedId.data), eq(automations.userId, req.user!.userId)))
+        .limit(1);
+
+      if (!automation) {
+        return res.status(404).json({ error: "Automation not found." });
+      }
+
+      return res.json({ automation });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async save(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedId = idParamSchema.safeParse(req.params.id);
+      if (!parsedId.success) {
+        return res.status(400).json({ error: "Invalid automation id." });
+      }
+
+      const { name, status, nodes, edges } = req.body;
+
+      const [automation] = await db
+        .update(automations)
+        .set({ name, status, nodes, edges, updatedAt: new Date() })
+        .where(and(eq(automations.id, parsedId.data), eq(automations.userId, req.user!.userId)))
+        .returning();
+
+      if (!automation) {
+        return res.status(404).json({ error: "Automation not found." });
+      }
+
+      return res.json({ automation });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async remove(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedId = idParamSchema.safeParse(req.params.id);
+      if (!parsedId.success) {
+        return res.status(400).json({ error: "Invalid automation id." });
+      }
+
+      const [deleted] = await db
+        .delete(automations)
+        .where(and(eq(automations.id, parsedId.data), eq(automations.userId, req.user!.userId)))
+        .returning({ id: automations.id });
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Automation not found." });
+      }
+
+      return res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  }
+}

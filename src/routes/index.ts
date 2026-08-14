@@ -7,6 +7,7 @@ import { workspaceRoutes } from "../modules/workspace/workspace.routes.js";
 import { uploadsRoutes } from "../modules/uploads/uploads.routes.js";
 import { templatesRoutes } from "../modules/templates/templates.routes.js";
 import { notificationsRoutes } from "../modules/notifications/notifications.routes.js";
+import { automationsRoutes } from "../modules/automations/automations.routes.js";
 
 export const router = Router();
 
@@ -18,3 +19,4 @@ router.use("/workspace", workspaceRoutes);
 router.use("/uploads", uploadsRoutes);
 router.use("/templates", templatesRoutes);
 router.use("/notifications", notificationsRoutes);
+router.use("/automations", automationsRoutes);
