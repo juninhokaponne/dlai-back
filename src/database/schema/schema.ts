@@ -225,6 +225,37 @@ export const creditTransactionsRelations = relations(
   }),
 );
 
+export const notificationType = pgEnum("notification_type", [
+  "newsletter_generated",
+  "newsletter_generation_failed",
+  "newsletter_sent",
+  "newsletter_send_failed",
+]);
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  type: notificationType("type").notNull(),
+  newsletterId: uuid("newsletter_id").references(() => newsletters.id, {
+    onDelete: "set null",
+  }),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  newsletter: one(newsletters, {
+    fields: [notifications.newsletterId],
+    references: [newsletters.id],
+  }),
+}));
+
 export const subscriptionStatus = pgEnum("subscription_status", [
   "active",
   "past_due",
