@@ -9,6 +9,7 @@ import {
   timestamp,
   pgEnum,
   unique,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
@@ -299,3 +300,25 @@ export const stripeEvents = pgTable("stripe_events", {
   type: varchar("type", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const automationStatus = pgEnum("automation_status", ["draft", "active"]);
+
+export const automations = pgTable("automations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  status: automationStatus("status").default("draft").notNull(),
+  nodes: jsonb("nodes").default([]).notNull(),
+  edges: jsonb("edges").default([]).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const automationsRelations = relations(automations, ({ one }) => ({
+  user: one(users, {
+    fields: [automations.userId],
+    references: [users.id],
+  }),
+}));
