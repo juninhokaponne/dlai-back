@@ -2,8 +2,10 @@ import type { NextFunction, Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { automations } from "../../database/schema/schema.js";
+import { automations, users } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
+import { computeNextRunAt, type RecurringSchedule } from "../../shared/automations/schedule.js";
+import type { GraphNode } from "../../shared/automations/graph-walk.js";
 
 const idParamSchema = z.string().uuid();
 
@@ -77,9 +79,29 @@ export class AutomationsController {
 
       const { name, status, nodes, edges } = req.body;
 
+      let nextRunAt: Date | null = null;
+      if (status === "active" && Array.isArray(nodes)) {
+        const trigger = (nodes as GraphNode[]).find(
+          (node) => node.type === "trigger" && node.data?.subtype === "recurring_schedule",
+        );
+        const rawConfig = trigger?.data.config;
+        if (rawConfig?.time) {
+          const [owner] = await db
+            .select({ timezone: users.timezone })
+            .from(users)
+            .where(eq(users.id, req.user!.userId))
+            .limit(1);
+          const schedule: RecurringSchedule = {
+            time: rawConfig.time,
+            days: JSON.parse(rawConfig.days ?? "[]"),
+          };
+          nextRunAt = computeNextRunAt(schedule, owner?.timezone ?? "America/Sao_Paulo", new Date());
+        }
+      }
+
       const [automation] = await db
         .update(automations)
-        .set({ name, status, nodes, edges, updatedAt: new Date() })
+        .set({ name, status, nodes, edges, nextRunAt, updatedAt: new Date() })
         .where(and(eq(automations.id, parsedId.data), eq(automations.userId, req.user!.userId)))
         .returning();
 
