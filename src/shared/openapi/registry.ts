@@ -420,7 +420,16 @@ registry.registerPath({
   path: "/api/billing/plans",
   tags: ["Billing"],
   summary: "Lista os planos disponiveis",
-  responses: { 200: { description: "Planos", content: { "application/json": { schema: z.object({ plans: z.array(z.object({})) }) } } } },
+  responses: {
+    200: {
+      description: "Planos",
+      content: {
+        "application/json": {
+          schema: z.object({ plans: z.array(z.object({})), trialPeriodDays: z.number() }),
+        },
+      },
+    },
+  },
 });
 
 registry.registerPath({
@@ -443,8 +452,51 @@ registry.registerPath({
   summary: "Assinatura atual do usuario autenticado (null se nunca assinou)",
   security: bearerAuth,
   responses: {
-    200: { description: "Assinatura atual", content: { "application/json": { schema: z.object({ subscription: z.object({}).nullable() }) } } },
+    200: {
+      description: "Assinatura atual",
+      content: {
+        "application/json": {
+          schema: z.object({
+            subscription: z.object({}).nullable(),
+            planCredits: z.number(),
+            creditsUsedThisCycle: z.number(),
+          }),
+        },
+      },
+    },
     401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/billing/invoices",
+  tags: ["Billing"],
+  summary: "Historico de faturas do usuario (buscado direto do Stripe)",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Faturas", content: { "application/json": { schema: z.object({ invoices: z.array(z.object({})) }) } } },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/billing/cancel",
+  tags: ["Billing"],
+  summary: "Cancela a assinatura ao final do periodo ja pago",
+  security: bearerAuth,
+  responses: {
+    200: {
+      description: "Assinatura marcada para cancelar",
+      content: {
+        "application/json": {
+          schema: z.object({ cancelAtPeriodEnd: z.boolean(), currentPeriodEnd: z.string().nullable() }),
+        },
+      },
+    },
+    401: errorResponse("Nao autenticado"),
+    404: errorResponse("Nenhuma assinatura ativa para cancelar"),
   },
 });
 

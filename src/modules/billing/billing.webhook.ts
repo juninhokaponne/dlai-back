@@ -60,6 +60,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
     status: toSubscriptionStatus(subscription.status),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodEnd: new Date(item.current_period_end * 1000),
   };
 
@@ -101,11 +102,18 @@ async function grantTrialCredits(subscription: Stripe.Subscription, eventId: str
 async function markSubscriptionCanceled(subscription: Stripe.Subscription) {
   await db
     .update(subscriptions)
-    .set({ status: "canceled", updatedAt: new Date() })
+    .set({ status: "canceled", cancelAtPeriodEnd: false, updatedAt: new Date() })
     .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
 }
 
 async function grantCreditsForInvoice(invoice: Stripe.Invoice, eventId: string) {
+  // Stripe issues a $0 invoice to set up the trial period itself, which
+  // fires invoice.paid alongside customer.subscription.created -- the
+  // latter already grants the plan's credits via grantTrialCredits, so
+  // crediting here too would double-grant. A $0 invoice never represents
+  // an actual charge worth granting fresh credits for.
+  if (invoice.amount_paid === 0) return;
+
   const customerId =
     typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   if (!customerId) return;
