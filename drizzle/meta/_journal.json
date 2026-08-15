@@ -148,6 +148,13 @@
       "when": 1786730216047,
       "tag": "0020_shallow_thunderball",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786817516596,
+      "tag": "0021_faithful_ultimatum",
+      "breakpoints": true
     }
   ]
 }
