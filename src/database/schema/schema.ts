@@ -47,8 +47,6 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   isEmailVerified: boolean("is_email_verified").default(false).notNull(),
-  creditBalance: integer("credit_balance").default(TRIAL_CREDITS).notNull(),
-  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
   newsletterViewMode: newsletterViewMode("newsletter_view_mode").default("list").notNull(),
   locale: userLocale("locale").default("en").notNull(),
   timezone: varchar("timezone", { length: 64 }).default("America/Sao_Paulo").notNull(),
@@ -128,7 +126,7 @@ export const newsletters = pgTable("newsletters", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
-  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
   topic: varchar("topic", { length: 500 }).notNull(),
   title: varchar("title", { length: 255 }),
   content: text("content"),
@@ -163,7 +161,7 @@ export const templates = pgTable("templates", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
-  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   category: varchar("category", { length: 100 }),
@@ -199,7 +197,7 @@ export const contacts = pgTable(
     userId: uuid("user_id")
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
-    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     name: varchar("name", { length: 255 }),
     status: contactStatus("status").default("subscribed").notNull(),
@@ -233,7 +231,7 @@ export const creditTransactions = pgTable("credit_transactions", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
-  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
   amount: integer("amount").notNull(),
   reason: creditTransactionReason("reason").notNull(),
   newsletterId: uuid("newsletter_id").references(() => newsletters.id, {
@@ -307,11 +305,10 @@ export const subscriptionStatus = pgEnum("subscription_status", [
 
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
+  organizationId: uuid("organization_id")
+    .references(() => organizations.id, { onDelete: "cascade" })
     .notNull()
     .unique(),
-  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
   plan: varchar("plan", { length: 50 }).notNull(),
   stripeSubscriptionId: varchar("stripe_subscription_id", {
     length: 255,
@@ -327,10 +324,6 @@ export const subscriptions = pgTable("subscriptions", {
 });
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
-  user: one(users, {
-    fields: [subscriptions.userId],
-    references: [users.id],
-  }),
   organization: one(organizations, {
     fields: [subscriptions.organizationId],
     references: [organizations.id],
@@ -350,7 +343,7 @@ export const automations = pgTable("automations", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
-  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   status: automationStatus("status").default("draft").notNull(),
   nodes: jsonb("nodes").default([]).notNull(),

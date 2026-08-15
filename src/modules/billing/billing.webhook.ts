@@ -55,12 +55,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
   const priceId = item.price.id;
   const plan = findPlanByPriceId(priceId);
 
-  // subscriptions.userId is still NOT NULL until Task 8 drops the column;
-  // the org's admin is the closest stand-in until then.
-  const adminUserId = await getAdminUserId(organizationId);
-
   const values = {
-    userId: adminUserId,
     organizationId,
     plan: plan?.key ?? "unknown",
     stripeSubscriptionId: subscription.id,
