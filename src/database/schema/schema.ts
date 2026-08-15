@@ -23,6 +23,13 @@ export const automationRunContactStatus = pgEnum("automation_run_contact_status"
   "completed",
   "failed",
 ]);
+export const organizationRole = pgEnum("organization_role", ["admin", "member"]);
+export const organizationInviteStatus = pgEnum("organization_invite_status", [
+  "pending",
+  "accepted",
+  "expired",
+  "revoked",
+]);
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -121,6 +128,7 @@ export const newsletters = pgTable("newsletters", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
   topic: varchar("topic", { length: 500 }).notNull(),
   title: varchar("title", { length: 255 }),
   content: text("content"),
@@ -144,6 +152,10 @@ export const newslettersRelations = relations(newsletters, ({ one }) => ({
     fields: [newsletters.userId],
     references: [users.id],
   }),
+  organization: one(organizations, {
+    fields: [newsletters.organizationId],
+    references: [organizations.id],
+  }),
 }));
 
 export const templates = pgTable("templates", {
@@ -151,6 +163,7 @@ export const templates = pgTable("templates", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   category: varchar("category", { length: 100 }),
@@ -164,6 +177,10 @@ export const templatesRelations = relations(templates, ({ one }) => ({
   user: one(users, {
     fields: [templates.userId],
     references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [templates.organizationId],
+    references: [organizations.id],
   }),
 }));
 
@@ -182,6 +199,7 @@ export const contacts = pgTable(
     userId: uuid("user_id")
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
+    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
     email: varchar("email", { length: 255 }).notNull(),
     name: varchar("name", { length: 255 }),
     status: contactStatus("status").default("subscribed").notNull(),
@@ -195,6 +213,10 @@ export const contactsRelations = relations(contacts, ({ one }) => ({
   user: one(users, {
     fields: [contacts.userId],
     references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [contacts.organizationId],
+    references: [organizations.id],
   }),
 }));
 
@@ -211,6 +233,7 @@ export const creditTransactions = pgTable("credit_transactions", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
   amount: integer("amount").notNull(),
   reason: creditTransactionReason("reason").notNull(),
   newsletterId: uuid("newsletter_id").references(() => newsletters.id, {
@@ -230,6 +253,10 @@ export const creditTransactionsRelations = relations(
     newsletter: one(newsletters, {
       fields: [creditTransactions.newsletterId],
       references: [newsletters.id],
+    }),
+    organization: one(organizations, {
+      fields: [creditTransactions.organizationId],
+      references: [organizations.id],
     }),
   }),
 );
@@ -284,6 +311,7 @@ export const subscriptions = pgTable("subscriptions", {
     .references(() => users.id, { onDelete: "cascade" })
     .notNull()
     .unique(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
   plan: varchar("plan", { length: 50 }).notNull(),
   stripeSubscriptionId: varchar("stripe_subscription_id", {
     length: 255,
@@ -303,6 +331,10 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
     fields: [subscriptions.userId],
     references: [users.id],
   }),
+  organization: one(organizations, {
+    fields: [subscriptions.organizationId],
+    references: [organizations.id],
+  }),
 }));
 
 export const stripeEvents = pgTable("stripe_events", {
@@ -318,6 +350,7 @@ export const automations = pgTable("automations", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   status: automationStatus("status").default("draft").notNull(),
   nodes: jsonb("nodes").default([]).notNull(),
@@ -332,6 +365,10 @@ export const automationsRelations = relations(automations, ({ one }) => ({
   user: one(users, {
     fields: [automations.userId],
     references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [automations.organizationId],
+    references: [organizations.id],
   }),
 }));
 
@@ -401,6 +438,69 @@ export const automationSendEvents = pgTable("automation_send_events", {
   openedAt: timestamp("opened_at"),
   clickedAt: timestamp("clicked_at"),
 });
+
+export const organizations = pgTable("organizations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  creditBalance: integer("credit_balance").default(TRIAL_CREDITS).notNull(),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }).unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  members: many(organizationMembers),
+  invites: many(organizationInvites),
+}));
+
+export const organizationMembers = pgTable("organization_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id")
+    .references(() => organizations.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull()
+    .unique(),
+  role: organizationRole("role").default("member").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organizationMembers.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [organizationMembers.userId],
+    references: [users.id],
+  }),
+}));
+
+export const organizationInvites = pgTable("organization_invites", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id")
+    .references(() => organizations.id, { onDelete: "cascade" })
+    .notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  role: organizationRole("role").default("member").notNull(),
+  invitedByUserId: uuid("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  status: organizationInviteStatus("status").default("pending").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const organizationInvitesRelations = relations(organizationInvites, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organizationInvites.organizationId],
+    references: [organizations.id],
+  }),
+  invitedBy: one(users, {
+    fields: [organizationInvites.invitedByUserId],
+    references: [users.id],
+  }),
+}));
 
 export const automationSendEventsRelations = relations(automationSendEvents, ({ one }) => ({
   runContact: one(automationRunContacts, {

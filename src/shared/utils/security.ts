@@ -31,6 +31,8 @@ export async function verifyPassword(
 export function generateAccessToken(payload: {
   userId: string;
   email: string;
+  organizationId: string;
+  role: "admin" | "member";
 }): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 }
@@ -38,8 +40,15 @@ export function generateAccessToken(payload: {
 export function verifyAccessToken(token: string): {
   userId: string;
   email: string;
+  organizationId: string;
+  role: "admin" | "member";
 } {
-  return jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
+  return jwt.verify(token, JWT_SECRET) as {
+    userId: string;
+    email: string;
+    organizationId: string;
+    role: "admin" | "member";
+  };
 }
 
 export function generateRefreshTokenRaw(): string {
