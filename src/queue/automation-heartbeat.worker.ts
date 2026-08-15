@@ -58,7 +58,7 @@ export async function startRun(automation: typeof automations.$inferSelect): Pro
   const recipients = await db
     .select({ id: contacts.id })
     .from(contacts)
-    .where(and(eq(contacts.userId, automation.userId), eq(contacts.status, "subscribed")));
+    .where(and(eq(contacts.organizationId, automation.organizationId!), eq(contacts.status, "subscribed")));
 
   await startRunForContacts(
     automation,
