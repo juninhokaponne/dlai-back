@@ -804,3 +804,29 @@ registry.registerPath({
     404: errorResponse("Automacao nao encontrada"),
   },
 });
+
+registry.registerPath({
+  method: "get",
+  path: "/api/automations/{id}/runs",
+  tags: ["Automations"],
+  summary: "Lista o historico de execucoes de uma automacao, com contagem de contatos por status",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    200: { description: "Execucoes", content: { "application/json": { schema: z.object({ runs: z.array(z.object({})) }) } } },
+    404: errorResponse("Automacao nao encontrada"),
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/automations/{id}/runs/{runId}/contacts",
+  tags: ["Automations"],
+  summary: "Lista os contatos de uma execucao especifica, com status e dados de abertura/clique",
+  security: bearerAuth,
+  request: { params: z.object({ id: z.string().uuid(), runId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Contatos da execucao", content: { "application/json": { schema: z.object({ contacts: z.array(z.object({})) }) } } },
+    404: errorResponse("Execucao nao encontrada"),
+  },
+});
