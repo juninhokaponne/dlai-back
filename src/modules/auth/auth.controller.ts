@@ -52,7 +52,6 @@ const USER_PROFILE_COLUMNS = {
   locale: users.locale,
   timezone: users.timezone,
   isEmailVerified: users.isEmailVerified,
-  creditBalance: users.creditBalance,
   createdAt: users.createdAt,
 };
 
@@ -107,7 +106,7 @@ export class AuthController {
           reason: "trial_grant",
         });
 
-        return { ...created!, organizationId: organization!.id };
+        return { ...created!, organizationId: organization!.id, creditBalance: organization!.creditBalance };
       });
 
       // No auth middleware runs on this route (the user doesn't exist yet
@@ -318,7 +317,13 @@ export class AuthController {
         return res.status(404).json({ error: "User not found." });
       }
 
-      return res.json({ user });
+      const [organization] = await db
+        .select({ creditBalance: organizations.creditBalance })
+        .from(organizations)
+        .where(eq(organizations.id, req.user!.organizationId))
+        .limit(1);
+
+      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0 } });
     } catch (err) {
       next(err);
     }
@@ -361,7 +366,13 @@ export class AuthController {
         .where(eq(users.id, req.user!.userId))
         .returning(USER_PROFILE_COLUMNS);
 
-      return res.json({ user });
+      const [organization] = await db
+        .select({ creditBalance: organizations.creditBalance })
+        .from(organizations)
+        .where(eq(organizations.id, req.user!.organizationId))
+        .limit(1);
+
+      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0 } });
     } catch (err) {
       next(err);
     }
