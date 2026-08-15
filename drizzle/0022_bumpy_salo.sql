@@ -1,0 +1,2 @@
+ALTER TABLE "contacts" DROP CONSTRAINT "contacts_user_id_email_unique";--> statement-breakpoint
+ALTER TABLE "contacts" ADD CONSTRAINT "contacts_organization_id_email_unique" UNIQUE("organization_id","email");

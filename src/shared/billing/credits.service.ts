@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../../database/index.js";
 import {
-  users,
+  organizations,
   creditTransactions,
   type creditTransactionReason,
 } from "../../database/schema/schema.js";
@@ -9,24 +9,30 @@ import { InsufficientCreditsError } from "./billing.errors.js";
 
 type CreditReason = (typeof creditTransactionReason.enumValues)[number];
 
-export async function debitCredits(
-  userId: string,
-  amount: number,
-  reason: CreditReason,
-  newsletterId?: string,
-): Promise<number> {
+export interface DebitCreditsParams {
+  organizationId: string;
+  userId: string;
+  amount: number;
+  reason: CreditReason;
+  newsletterId?: string;
+}
+
+export async function debitCredits(params: DebitCreditsParams): Promise<number> {
+  const { organizationId, userId, amount, reason, newsletterId } = params;
+
   return db.transaction(async (tx) => {
     const [updated] = await tx
-      .update(users)
-      .set({ creditBalance: sql`${users.creditBalance} - ${amount}` })
-      .where(and(eq(users.id, userId), gte(users.creditBalance, amount)))
-      .returning({ creditBalance: users.creditBalance });
+      .update(organizations)
+      .set({ creditBalance: sql`${organizations.creditBalance} - ${amount}` })
+      .where(and(eq(organizations.id, organizationId), gte(organizations.creditBalance, amount)))
+      .returning({ creditBalance: organizations.creditBalance });
 
     if (!updated) {
       throw new InsufficientCreditsError();
     }
 
     await tx.insert(creditTransactions).values({
+      organizationId,
       userId,
       amount: -amount,
       reason,
@@ -37,38 +43,45 @@ export async function debitCredits(
   });
 }
 
-export async function creditCredits(
-  userId: string,
-  amount: number,
-  reason: CreditReason,
-  options: { newsletterId?: string; stripeEventId?: string } = {},
-): Promise<number> {
+export interface CreditCreditsParams {
+  organizationId: string;
+  userId: string;
+  amount: number;
+  reason: CreditReason;
+  newsletterId?: string;
+  stripeEventId?: string;
+}
+
+export async function creditCredits(params: CreditCreditsParams): Promise<number> {
+  const { organizationId, userId, amount, reason, newsletterId, stripeEventId } = params;
+
   return db.transaction(async (tx) => {
     const [updated] = await tx
-      .update(users)
-      .set({ creditBalance: sql`${users.creditBalance} + ${amount}` })
-      .where(eq(users.id, userId))
-      .returning({ creditBalance: users.creditBalance });
+      .update(organizations)
+      .set({ creditBalance: sql`${organizations.creditBalance} + ${amount}` })
+      .where(eq(organizations.id, organizationId))
+      .returning({ creditBalance: organizations.creditBalance });
 
     await tx.insert(creditTransactions).values({
+      organizationId,
       userId,
       amount,
       reason,
-      ...(options.newsletterId ? { newsletterId: options.newsletterId } : {}),
-      ...(options.stripeEventId ? { stripeEventId: options.stripeEventId } : {}),
+      ...(newsletterId ? { newsletterId } : {}),
+      ...(stripeEventId ? { stripeEventId } : {}),
     });
 
     return updated!.creditBalance;
   });
 }
 
-export async function getCreditsUsedThisCycle(userId: string): Promise<number> {
+export async function getCreditsUsedThisCycle(organizationId: string): Promise<number> {
   const [lastGrant] = await db
     .select({ createdAt: creditTransactions.createdAt })
     .from(creditTransactions)
     .where(
       and(
-        eq(creditTransactions.userId, userId),
+        eq(creditTransactions.organizationId, organizationId),
         inArray(creditTransactions.reason, ["subscription_grant", "trial_grant"]),
       ),
     )
@@ -82,7 +95,7 @@ export async function getCreditsUsedThisCycle(userId: string): Promise<number> {
     .from(creditTransactions)
     .where(
       and(
-        eq(creditTransactions.userId, userId),
+        eq(creditTransactions.organizationId, organizationId),
         inArray(creditTransactions.reason, ["generation_debit", "generation_refund"]),
         gte(creditTransactions.createdAt, cycleStart),
       ),

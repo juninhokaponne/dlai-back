@@ -20,7 +20,7 @@ export class AutomationsController {
           updatedAt: automations.updatedAt,
         })
         .from(automations)
-        .where(eq(automations.userId, req.user!.userId))
+        .where(eq(automations.organizationId, req.user!.organizationId))
         .orderBy(desc(automations.updatedAt));
 
       return res.json({ automations: rows });
@@ -38,7 +38,14 @@ export class AutomationsController {
 
       const [automation] = await db
         .insert(automations)
-        .values({ userId: req.user!.userId, name, status: "draft", nodes: [], edges: [] })
+        .values({
+          userId: req.user!.userId,
+          organizationId: req.user!.organizationId,
+          name,
+          status: "draft",
+          nodes: [],
+          edges: [],
+        })
         .returning();
 
       return res.status(201).json({ automation });
@@ -57,7 +64,7 @@ export class AutomationsController {
       const [automation] = await db
         .select()
         .from(automations)
-        .where(and(eq(automations.id, parsedId.data), eq(automations.userId, req.user!.userId)))
+        .where(and(eq(automations.id, parsedId.data), eq(automations.organizationId, req.user!.organizationId)))
         .limit(1);
 
       if (!automation) {
@@ -102,7 +109,7 @@ export class AutomationsController {
       const [automation] = await db
         .update(automations)
         .set({ name, status, nodes, edges, nextRunAt, updatedAt: new Date() })
-        .where(and(eq(automations.id, parsedId.data), eq(automations.userId, req.user!.userId)))
+        .where(and(eq(automations.id, parsedId.data), eq(automations.organizationId, req.user!.organizationId)))
         .returning();
 
       if (!automation) {
@@ -124,7 +131,7 @@ export class AutomationsController {
 
       const [deleted] = await db
         .delete(automations)
-        .where(and(eq(automations.id, parsedId.data), eq(automations.userId, req.user!.userId)))
+        .where(and(eq(automations.id, parsedId.data), eq(automations.organizationId, req.user!.organizationId)))
         .returning({ id: automations.id });
 
       if (!deleted) {

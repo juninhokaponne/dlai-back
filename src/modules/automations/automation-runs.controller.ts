@@ -14,11 +14,11 @@ import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 
 const idParamSchema = z.string().uuid();
 
-async function findOwnedAutomation(id: string, userId: string) {
+async function findOwnedAutomation(id: string, organizationId: string) {
   const [automation] = await db
     .select({ id: automations.id })
     .from(automations)
-    .where(and(eq(automations.id, id), eq(automations.userId, userId)))
+    .where(and(eq(automations.id, id), eq(automations.organizationId, organizationId)))
     .limit(1);
 
   return automation;
@@ -32,7 +32,7 @@ export class AutomationRunsController {
         return res.status(400).json({ error: "Invalid automation id." });
       }
 
-      const automation = await findOwnedAutomation(parsedId.data, req.user!.userId);
+      const automation = await findOwnedAutomation(parsedId.data, req.user!.organizationId);
       if (!automation) {
         return res.status(404).json({ error: "Automation not found." });
       }
@@ -91,7 +91,7 @@ export class AutomationRunsController {
         return res.status(400).json({ error: "Invalid id." });
       }
 
-      const automation = await findOwnedAutomation(parsedAutomationId.data, req.user!.userId);
+      const automation = await findOwnedAutomation(parsedAutomationId.data, req.user!.organizationId);
       if (!automation) {
         return res.status(404).json({ error: "Automation not found." });
       }

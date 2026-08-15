@@ -58,8 +58,8 @@ async function processJob(job: Job<NewsletterSendJobData>) {
   const sendDate = new Date().toLocaleDateString("pt-BR");
 
   const recipientsWhere = contactId
-    ? and(eq(contacts.userId, newsletter.userId), eq(contacts.id, contactId), eq(contacts.status, "subscribed"))
-    : and(eq(contacts.userId, newsletter.userId), eq(contacts.status, "subscribed"));
+    ? and(eq(contacts.organizationId, newsletter.organizationId!), eq(contacts.id, contactId), eq(contacts.status, "subscribed"))
+    : and(eq(contacts.organizationId, newsletter.organizationId!), eq(contacts.status, "subscribed"));
 
   const recipients = await db.select().from(contacts).where(recipientsWhere);
 

@@ -6,10 +6,10 @@ import { debitCredits } from "../../shared/billing/credits.service.js";
 import { GENERATION_CREDIT_COST } from "../../shared/billing/credits.config.js";
 import { findBodyModelOption, type BodyModelId } from "../../shared/ai/ai.config.js";
 
-export async function createNewsletter(userId: string, topic: string) {
+export async function createNewsletter(organizationId: string, userId: string, topic: string) {
   const [newsletter] = await db
     .insert(newsletters)
-    .values({ userId, topic })
+    .values({ organizationId, userId, topic })
     .returning();
 
   return newsletter!;
@@ -17,6 +17,7 @@ export async function createNewsletter(userId: string, topic: string) {
 
 export async function startNewsletterGeneration(
   newsletterId: string,
+  organizationId: string,
   userId: string,
   bodyModel?: BodyModelId,
 ) {
@@ -32,12 +33,13 @@ export async function startNewsletterGeneration(
     creditCost = option.creditCost;
   }
 
-  const creditBalance = await debitCredits(
+  const creditBalance = await debitCredits({
+    organizationId,
     userId,
-    creditCost,
-    "generation_debit",
+    amount: creditCost,
+    reason: "generation_debit",
     newsletterId,
-  );
+  });
 
   const [updated] = await db
     .update(newsletters)
@@ -47,6 +49,7 @@ export async function startNewsletterGeneration(
 
   await getNewsletterGenerateQueue().add("generate", {
     newsletterId,
+    organizationId,
     userId,
     creditCost,
     ...(bodyModel ? { bodyModel } : {}),

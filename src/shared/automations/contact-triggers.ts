@@ -9,14 +9,14 @@ const logger = createLogger("contact-triggers");
 
 // Never throws - a trigger failing to fire must never break the contact-creation
 // request that caused it, same reasoning as createNotification.
-export async function fireNewSubscriberAutomations(userId: string, contactIds: string[]): Promise<void> {
+export async function fireNewSubscriberAutomations(organizationId: string, contactIds: string[]): Promise<void> {
   if (contactIds.length === 0) return;
 
   try {
     const activeAutomations = await db
       .select()
       .from(automations)
-      .where(and(eq(automations.userId, userId), eq(automations.status, "active")));
+      .where(and(eq(automations.organizationId, organizationId), eq(automations.status, "active")));
 
     for (const automation of activeAutomations) {
       const nodes = automation.nodes as GraphNode[];
@@ -25,6 +25,6 @@ export async function fireNewSubscriberAutomations(userId: string, contactIds: s
       await startRunForContacts(automation, "new_subscriber", contactIds);
     }
   } catch (err) {
-    logger.error({ err, userId }, "Failed to fire new_subscriber automations");
+    logger.error({ err, organizationId }, "Failed to fire new_subscriber automations");
   }
 }

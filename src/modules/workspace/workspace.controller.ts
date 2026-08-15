@@ -1,7 +1,7 @@
 import type { NextFunction, Response } from "express";
 import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
-import { contacts, newsletters, users } from "../../database/schema/schema.js";
+import { contacts, newsletters, organizations, users } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { AIService } from "../../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../../shared/ai/openrouter.provider.js";
@@ -25,18 +25,18 @@ function splitLines(content: string, max: number): string[] {
 export class WorkspaceController {
   async overview(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
+      const { organizationId } = req.user!;
 
-      const [user] = await db
-        .select({ creditBalance: users.creditBalance })
-        .from(users)
-        .where(eq(users.id, userId))
+      const [organization] = await db
+        .select({ creditBalance: organizations.creditBalance })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
         .limit(1);
 
       const statusRows = await db
         .select({ status: newsletters.status, count: count() })
         .from(newsletters)
-        .where(eq(newsletters.userId, userId))
+        .where(eq(newsletters.organizationId, organizationId))
         .groupBy(newsletters.status);
 
       const newslettersByStatus = Object.fromEntries(
@@ -45,7 +45,7 @@ export class WorkspaceController {
 
       const subscribedContacts = await db.$count(
         contacts,
-        and(eq(contacts.userId, userId), eq(contacts.status, "subscribed")),
+        and(eq(contacts.organizationId, organizationId), eq(contacts.status, "subscribed")),
       );
 
       const recentNewsletters = await db
@@ -57,12 +57,12 @@ export class WorkspaceController {
           createdAt: newsletters.createdAt,
         })
         .from(newsletters)
-        .where(eq(newsletters.userId, userId))
+        .where(eq(newsletters.organizationId, organizationId))
         .orderBy(desc(newsletters.createdAt))
         .limit(5);
 
       return res.json({
-        creditBalance: user?.creditBalance ?? 0,
+        creditBalance: organization?.creditBalance ?? 0,
         newslettersByStatus,
         subscribedContacts,
         recentNewsletters,
@@ -85,7 +85,7 @@ export class WorkspaceController {
       const recent = await db
         .select({ topic: newsletters.topic })
         .from(newsletters)
-        .where(eq(newsletters.userId, userId))
+        .where(eq(newsletters.organizationId, req.user!.organizationId))
         .orderBy(desc(newsletters.createdAt))
         .limit(RECENT_TOPICS_SAMPLE);
 
@@ -111,10 +111,14 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
 
   async rewrite(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
       const { text } = req.body;
 
-      const creditBalance = await debitCredits(userId, QUICK_ACTION_CREDIT_COST, "generation_debit");
+      const creditBalance = await debitCredits({
+        organizationId: req.user!.organizationId,
+        userId: req.user!.userId,
+        amount: QUICK_ACTION_CREDIT_COST,
+        reason: "generation_debit",
+      });
 
       const result = await aiService.run(
         "body",
@@ -129,10 +133,14 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
 
   async summarize(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
       const { text } = req.body;
 
-      const creditBalance = await debitCredits(userId, QUICK_ACTION_CREDIT_COST, "generation_debit");
+      const creditBalance = await debitCredits({
+        organizationId: req.user!.organizationId,
+        userId: req.user!.userId,
+        amount: QUICK_ACTION_CREDIT_COST,
+        reason: "generation_debit",
+      });
 
       const result = await aiService.run(
         "body",
@@ -147,10 +155,14 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
 
   async subjectLines(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
       const { text } = req.body;
 
-      const creditBalance = await debitCredits(userId, QUICK_ACTION_CREDIT_COST, "generation_debit");
+      const creditBalance = await debitCredits({
+        organizationId: req.user!.organizationId,
+        userId: req.user!.userId,
+        amount: QUICK_ACTION_CREDIT_COST,
+        reason: "generation_debit",
+      });
 
       const result = await aiService.run(
         "title",
@@ -168,11 +180,12 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
   async generate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { topic, model } = req.body;
-      const userId = req.user!.userId;
+      const { userId, organizationId } = req.user!;
 
-      const newsletter = await createNewsletter(userId, topic);
+      const newsletter = await createNewsletter(organizationId, userId, topic);
       const { newsletter: updated, creditBalance } = await startNewsletterGeneration(
         newsletter.id,
+        organizationId,
         userId,
         model,
       );

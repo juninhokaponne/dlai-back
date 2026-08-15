@@ -11,11 +11,11 @@ import { BODY_MODEL_OPTIONS } from "../../shared/ai/ai.config.js";
 
 const idParamSchema = z.string().uuid();
 
-async function findOwnedNewsletter(id: string, userId: string) {
+async function findOwnedNewsletter(id: string, organizationId: string) {
   const [newsletter] = await db
     .select()
     .from(newsletters)
-    .where(and(eq(newsletters.id, id), eq(newsletters.userId, userId)))
+    .where(and(eq(newsletters.id, id), eq(newsletters.organizationId, organizationId)))
     .limit(1);
 
   return newsletter;
@@ -35,7 +35,7 @@ export class NewsletterController {
       const rows = await db
         .select()
         .from(newsletters)
-        .where(eq(newsletters.userId, req.user!.userId))
+        .where(eq(newsletters.organizationId, req.user!.organizationId))
         .orderBy(desc(newsletters.createdAt));
 
       return res.json({ newsletters: rows });
@@ -47,7 +47,7 @@ export class NewsletterController {
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { topic } = req.body;
-      const newsletter = await createNewsletter(req.user!.userId, topic);
+      const newsletter = await createNewsletter(req.user!.organizationId, req.user!.userId, topic);
       return res.status(201).json({ newsletter });
     } catch (err) {
       next(err);
@@ -63,7 +63,7 @@ export class NewsletterController {
 
       const newsletter = await findOwnedNewsletter(
         parsedId.data,
-        req.user!.userId,
+        req.user!.organizationId,
       );
       if (!newsletter) {
         return res.status(404).json({ error: "Newsletter not found." });
@@ -93,7 +93,7 @@ export class NewsletterController {
         .where(
           and(
             eq(newsletters.id, parsedId.data),
-            eq(newsletters.userId, req.user!.userId),
+            eq(newsletters.organizationId, req.user!.organizationId),
           ),
         )
         .returning();
@@ -117,7 +117,7 @@ export class NewsletterController {
 
       const newsletter = await findOwnedNewsletter(
         parsedId.data,
-        req.user!.userId,
+        req.user!.organizationId,
       );
       if (!newsletter) {
         return res.status(404).json({ error: "Newsletter not found." });
@@ -131,6 +131,7 @@ export class NewsletterController {
 
       const { newsletter: updated, creditBalance } = await startNewsletterGeneration(
         newsletter.id,
+        req.user!.organizationId,
         req.user!.userId,
         req.body?.model,
       );
@@ -150,7 +151,7 @@ export class NewsletterController {
 
       const newsletter = await findOwnedNewsletter(
         parsedId.data,
-        req.user!.userId,
+        req.user!.organizationId,
       );
       if (!newsletter) {
         return res.status(404).json({ error: "Newsletter not found." });
@@ -183,7 +184,7 @@ export class NewsletterController {
 
       const count = await db.$count(
         contacts,
-        and(eq(contacts.userId, req.user!.userId), eq(contacts.status, "subscribed")),
+        and(eq(contacts.organizationId, req.user!.organizationId), eq(contacts.status, "subscribed")),
       );
 
       if (count === 0) {
@@ -220,7 +221,7 @@ export class NewsletterController {
 
       const [deleted] = await db
         .delete(newsletters)
-        .where(and(eq(newsletters.id, parsedId.data), eq(newsletters.userId, req.user!.userId)))
+        .where(and(eq(newsletters.id, parsedId.data), eq(newsletters.organizationId, req.user!.organizationId)))
         .returning({ id: newsletters.id });
 
       if (!deleted) {

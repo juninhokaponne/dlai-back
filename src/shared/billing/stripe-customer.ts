@@ -1,35 +1,36 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
-import { users } from "../../database/schema/schema.js";
+import { organizations } from "../../database/schema/schema.js";
 import { getStripeClient } from "./stripe-client.js";
 
 export async function getOrCreateStripeCustomerId(
-  userId: string,
+  organizationId: string,
+  email: string,
 ): Promise<string> {
-  const [user] = await db
-    .select({ stripeCustomerId: users.stripeCustomerId, email: users.email })
-    .from(users)
-    .where(eq(users.id, userId))
+  const [organization] = await db
+    .select({ stripeCustomerId: organizations.stripeCustomerId })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
     .limit(1);
 
-  if (!user) {
-    throw new Error("User not found.");
+  if (!organization) {
+    throw new Error("Organization not found.");
   }
 
-  if (user.stripeCustomerId) {
-    return user.stripeCustomerId;
+  if (organization.stripeCustomerId) {
+    return organization.stripeCustomerId;
   }
 
   const stripe = getStripeClient();
   const customer = await stripe.customers.create({
-    email: user.email,
-    metadata: { userId },
+    email,
+    metadata: { organizationId },
   });
 
   await db
-    .update(users)
+    .update(organizations)
     .set({ stripeCustomerId: customer.id })
-    .where(eq(users.id, userId));
+    .where(eq(organizations.id, organizationId));
 
   return customer.id;
 }

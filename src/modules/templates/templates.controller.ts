@@ -19,7 +19,7 @@ export class TemplatesController {
       const rows = await db
         .select()
         .from(templates)
-        .where(eq(templates.userId, req.user!.userId))
+        .where(eq(templates.organizationId, req.user!.organizationId))
         .orderBy(desc(templates.createdAt));
 
       return res.json({ templates: rows });
@@ -38,7 +38,7 @@ export class TemplatesController {
       const [template] = await db
         .select()
         .from(templates)
-        .where(and(eq(templates.id, parsedId.data), eq(templates.userId, req.user!.userId)))
+        .where(and(eq(templates.id, parsedId.data), eq(templates.organizationId, req.user!.organizationId)))
         .limit(1);
 
       if (!template) {
@@ -59,6 +59,7 @@ export class TemplatesController {
         .insert(templates)
         .values({
           userId: req.user!.userId,
+          organizationId: req.user!.organizationId,
           name,
           contentHtml,
           ...(description !== undefined ? { description } : {}),
@@ -89,6 +90,7 @@ ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`;
         .insert(templates)
         .values({
           userId: req.user!.userId,
+          organizationId: req.user!.organizationId,
           name,
           description,
           contentHtml: result.content.trim(),
@@ -113,7 +115,7 @@ ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`;
       const [template] = await db
         .select()
         .from(templates)
-        .where(and(eq(templates.id, parsedId.data), eq(templates.userId, req.user!.userId)))
+        .where(and(eq(templates.id, parsedId.data), eq(templates.organizationId, req.user!.organizationId)))
         .limit(1);
 
       if (!template) {
@@ -124,6 +126,7 @@ ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`;
         .insert(newsletters)
         .values({
           userId: req.user!.userId,
+          organizationId: req.user!.organizationId,
           topic: template.name,
           title: template.name,
           content: template.contentHtml,
@@ -152,7 +155,7 @@ ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`;
 
       const [deleted] = await db
         .delete(templates)
-        .where(and(eq(templates.id, parsedId.data), eq(templates.userId, req.user!.userId)))
+        .where(and(eq(templates.id, parsedId.data), eq(templates.organizationId, req.user!.organizationId)))
         .returning({ id: templates.id });
 
       if (!deleted) {
