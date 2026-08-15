@@ -1,7 +1,7 @@
 import type { NextFunction, Response } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
-import { subscriptions, users } from "../../database/schema/schema.js";
+import { subscriptions, organizations } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { PLANS, PLAN_KEYS, TRIAL_PERIOD_DAYS, type PlanKey } from "../../shared/billing/plans.config.js";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
@@ -42,7 +42,7 @@ export class BillingController {
         });
       }
 
-      const customerId = await getOrCreateStripeCustomerId(req.user!.userId);
+      const customerId = await getOrCreateStripeCustomerId(req.user!.organizationId, req.user!.email);
       const stripe = getStripeClient();
 
       // Only first-time subscribers get a trial, so canceling and
@@ -50,7 +50,7 @@ export class BillingController {
       const [previousSubscription] = await db
         .select({ id: subscriptions.id })
         .from(subscriptions)
-        .where(eq(subscriptions.userId, req.user!.userId))
+        .where(eq(subscriptions.organizationId, req.user!.organizationId))
         .limit(1);
 
       const session = await stripe.checkout.sessions.create({
@@ -59,7 +59,7 @@ export class BillingController {
         line_items: [{ price: plan.stripePriceId, quantity: 1 }],
         success_url: `${FRONTEND_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${FRONTEND_URL}/billing/cancel`,
-        metadata: { userId: req.user!.userId, plan: req.body.plan },
+        metadata: { organizationId: req.user!.organizationId, plan: req.body.plan },
         // Prices are set in BRL; adaptive_pricing lets Stripe show a localized
         // estimate to customers paying with a non-BRL card without us having
         // to maintain per-currency prices.
@@ -77,7 +77,7 @@ export class BillingController {
 
   async getSubscription(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
+      const organizationId = req.user!.organizationId;
 
       const [subscription] = await db
         .select({
@@ -87,7 +87,7 @@ export class BillingController {
           cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
         })
         .from(subscriptions)
-        .where(eq(subscriptions.userId, userId))
+        .where(eq(subscriptions.organizationId, organizationId))
         .limit(1);
 
       const planCredits =
@@ -97,7 +97,7 @@ export class BillingController {
           ? PLANS[subscription.plan as PlanKey].credits
           : TRIAL_CREDITS;
 
-      const creditsUsedThisCycle = await getCreditsUsedThisCycle(userId);
+      const creditsUsedThisCycle = await getCreditsUsedThisCycle(organizationId);
 
       return res.json({
         subscription: subscription ?? null,
@@ -111,13 +111,13 @@ export class BillingController {
 
   async listInvoices(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const [user] = await db
-        .select({ stripeCustomerId: users.stripeCustomerId })
-        .from(users)
-        .where(eq(users.id, req.user!.userId))
+      const [organization] = await db
+        .select({ stripeCustomerId: organizations.stripeCustomerId })
+        .from(organizations)
+        .where(eq(organizations.id, req.user!.organizationId))
         .limit(1);
 
-      if (!user?.stripeCustomerId) {
+      if (!organization?.stripeCustomerId) {
         return res.json({ invoices: [] });
       }
 
@@ -125,11 +125,11 @@ export class BillingController {
       let result: Stripe.Response<Stripe.ApiList<Stripe.Invoice>>;
       try {
         result = await stripe.invoices.list({
-          customer: user.stripeCustomerId,
+          customer: organization.stripeCustomerId,
           limit: 12,
         });
       } catch (err) {
-        logger.error({ err, userId: req.user!.userId }, "Stripe invoices.list failed");
+        logger.error({ err, organizationId: req.user!.organizationId }, "Stripe invoices.list failed");
         return res.status(502).json({ error: "Unable to load invoices right now." });
       }
 
@@ -150,7 +150,7 @@ export class BillingController {
 
   async cancelSubscription(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
+      const organizationId = req.user!.organizationId;
 
       const [subscription] = await db
         .select({
@@ -159,7 +159,7 @@ export class BillingController {
           status: subscriptions.status,
         })
         .from(subscriptions)
-        .where(eq(subscriptions.userId, userId))
+        .where(eq(subscriptions.organizationId, organizationId))
         .limit(1);
 
       if (!subscription || subscription.status === "canceled") {

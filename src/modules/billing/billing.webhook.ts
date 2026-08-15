@@ -2,9 +2,10 @@ import type { Request, Response } from "express";
 import type Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
-import { users, subscriptions, stripeEvents } from "../../database/schema/schema.js";
+import { organizations, subscriptions, stripeEvents } from "../../database/schema/schema.js";
 import { getStripeClient } from "../../shared/billing/stripe-client.js";
 import { creditCredits } from "../../shared/billing/credits.service.js";
+import { getAdminUserId } from "../../shared/organizations/organizations.service.js";
 import { PLANS, type PlanKey } from "../../shared/billing/plans.config.js";
 import { subscriptionStatus } from "../../database/schema/schema.js";
 import { createLogger } from "../../shared/logger/logger.js";
@@ -27,13 +28,13 @@ function findPlanByPriceId(priceId: string): { key: PlanKey; credits: number } |
   return null;
 }
 
-async function findUserIdByCustomerId(customerId: string): Promise<string | null> {
-  const [user] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.stripeCustomerId, customerId))
+async function findOrganizationIdByCustomerId(customerId: string): Promise<string | null> {
+  const [organization] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.stripeCustomerId, customerId))
     .limit(1);
-  return user?.id ?? null;
+  return organization?.id ?? null;
 }
 
 async function syncSubscription(subscription: Stripe.Subscription) {
@@ -42,9 +43,9 @@ async function syncSubscription(subscription: Stripe.Subscription) {
       ? subscription.customer
       : subscription.customer.id;
 
-  const userId = await findUserIdByCustomerId(customerId);
-  if (!userId) {
-    logger.error({ customerId }, "No user found for Stripe customer");
+  const organizationId = await findOrganizationIdByCustomerId(customerId);
+  if (!organizationId) {
+    logger.error({ customerId }, "No organization found for Stripe customer");
     return;
   }
 
@@ -55,7 +56,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
   const plan = findPlanByPriceId(priceId);
 
   const values = {
-    userId,
+    organizationId,
     plan: plan?.key ?? "unknown",
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
@@ -68,7 +69,7 @@ async function syncSubscription(subscription: Stripe.Subscription) {
     .insert(subscriptions)
     .values(values)
     .onConflictDoUpdate({
-      target: subscriptions.userId,
+      target: subscriptions.organizationId,
       set: { ...values, updatedAt: new Date() },
     });
 }
@@ -79,9 +80,9 @@ async function grantTrialCredits(subscription: Stripe.Subscription, eventId: str
       ? subscription.customer
       : subscription.customer.id;
 
-  const userId = await findUserIdByCustomerId(customerId);
-  if (!userId) {
-    logger.error({ customerId }, "No user found for Stripe customer");
+  const organizationId = await findOrganizationIdByCustomerId(customerId);
+  if (!organizationId) {
+    logger.error({ customerId }, "No organization found for Stripe customer");
     return;
   }
 
@@ -94,7 +95,12 @@ async function grantTrialCredits(subscription: Stripe.Subscription, eventId: str
     return;
   }
 
-  await creditCredits(userId, plan.credits, "subscription_grant", {
+  const adminUserId = await getAdminUserId(organizationId);
+  await creditCredits({
+    organizationId,
+    userId: adminUserId,
+    amount: plan.credits,
+    reason: "subscription_grant",
     stripeEventId: eventId,
   });
 }
@@ -118,9 +124,9 @@ async function grantCreditsForInvoice(invoice: Stripe.Invoice, eventId: string) 
     typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   if (!customerId) return;
 
-  const userId = await findUserIdByCustomerId(customerId);
-  if (!userId) {
-    logger.error({ customerId }, "No user found for Stripe customer");
+  const organizationId = await findOrganizationIdByCustomerId(customerId);
+  if (!organizationId) {
+    logger.error({ customerId }, "No organization found for Stripe customer");
     return;
   }
 
@@ -138,7 +144,12 @@ async function grantCreditsForInvoice(invoice: Stripe.Invoice, eventId: string) 
     return;
   }
 
-  await creditCredits(userId, plan.credits, "subscription_grant", {
+  const adminUserId = await getAdminUserId(organizationId);
+  await creditCredits({
+    organizationId,
+    userId: adminUserId,
+    amount: plan.credits,
+    reason: "subscription_grant",
     stripeEventId: eventId,
   });
 }

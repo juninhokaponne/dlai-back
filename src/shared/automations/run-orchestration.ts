@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../../database/index.js";
 import { automations, automationRuns, automationRunContacts, newsletters, templates } from "../../database/schema/schema.js";
 import type { GraphEdge, GraphNode } from "./graph-walk.js";
@@ -35,8 +35,8 @@ export async function resolveRunContent(
     if (!topic) return null;
 
     try {
-      const newsletter = await createNewsletter(automation.userId, topic);
-      await startNewsletterGeneration(newsletter.id, automation.userId);
+      const newsletter = await createNewsletter(automation.organizationId!, automation.userId, topic);
+      await startNewsletterGeneration(newsletter.id, automation.organizationId!, automation.userId);
       return { newsletterId: newsletter.id };
     } catch (err) {
       if (err instanceof InsufficientCreditsError) {
@@ -57,20 +57,25 @@ export async function resolveRunContent(
     const [existing] = await db
       .select({ status: newsletters.status })
       .from(newsletters)
-      .where(eq(newsletters.id, config.contentId))
+      .where(and(eq(newsletters.id, config.contentId), eq(newsletters.organizationId, automation.organizationId!)))
       .limit(1);
     if (!existing || (existing.status !== "ready" && existing.status !== "sent")) return null;
     return { newsletterId: config.contentId };
   }
 
   if (config.contentType === "template" && config.contentId) {
-    const [template] = await db.select().from(templates).where(eq(templates.id, config.contentId)).limit(1);
+    const [template] = await db
+      .select()
+      .from(templates)
+      .where(and(eq(templates.id, config.contentId), eq(templates.organizationId, automation.organizationId!)))
+      .limit(1);
     if (!template) return null;
 
     const [newsletter] = await db
       .insert(newsletters)
       .values({
         userId: automation.userId,
+        organizationId: automation.organizationId,
         topic: template.name,
         title: template.name,
         content: template.contentHtml,
