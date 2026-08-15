@@ -206,7 +206,7 @@ export const contacts = pgTable(
     unsubscribeToken: uuid("unsubscribe_token").defaultRandom().notNull().unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [unique("contacts_user_id_email_unique").on(table.userId, table.email)],
+  (table) => [unique("contacts_organization_id_email_unique").on(table.organizationId, table.email)],
 );
 
 export const contactsRelations = relations(contacts, ({ one }) => ({

@@ -56,10 +56,10 @@ export class ContactsController {
 
       const whereClause = search
         ? and(
-            eq(contacts.userId, req.user!.userId),
+            eq(contacts.organizationId, req.user!.organizationId),
             or(ilike(contacts.email, `%${search}%`), ilike(contacts.name, `%${search}%`)),
           )
-        : eq(contacts.userId, req.user!.userId);
+        : eq(contacts.organizationId, req.user!.organizationId);
 
       const [rows, total] = await Promise.all([
         db
@@ -82,7 +82,7 @@ export class ContactsController {
     try {
       const { email, name } = req.body;
 
-      const totalContacts = await db.$count(contacts, eq(contacts.userId, req.user!.userId));
+      const totalContacts = await db.$count(contacts, eq(contacts.organizationId, req.user!.organizationId));
       if (totalContacts >= MAX_MANUAL_CONTACTS) {
         return res.status(400).json({
           error: `Manual contact creation is limited to ${MAX_MANUAL_CONTACTS} contacts. Use CSV import for larger lists.`,
@@ -92,7 +92,7 @@ export class ContactsController {
       const [existing] = await db
         .select({ id: contacts.id })
         .from(contacts)
-        .where(and(eq(contacts.userId, req.user!.userId), eq(contacts.email, email)))
+        .where(and(eq(contacts.organizationId, req.user!.organizationId), eq(contacts.email, email)))
         .limit(1);
 
       if (existing) {
@@ -103,12 +103,13 @@ export class ContactsController {
         .insert(contacts)
         .values({
           userId: req.user!.userId,
+          organizationId: req.user!.organizationId,
           email,
           ...(name !== undefined ? { name } : {}),
         })
         .returning();
 
-      void fireNewSubscriberAutomations(req.user!.userId, [contact!.id]);
+      void fireNewSubscriberAutomations(req.user!.organizationId, [contact!.id]);
 
       return res.status(201).json({ contact });
     } catch (err) {
@@ -143,18 +144,19 @@ export class ContactsController {
     return { validRows, invalidCount, invalidSamples };
   }
 
-  private async insertContacts(userId: string, validRows: z.infer<typeof contactRowSchema>[]) {
+  private async insertContacts(userId: string, organizationId: string, validRows: z.infer<typeof contactRowSchema>[]) {
     return db
       .insert(contacts)
       .values(
         validRows.map((row) => ({
           email: row.email,
           userId,
+          organizationId,
           ...(row.name !== undefined ? { name: row.name } : {}),
         })),
       )
       .onConflictDoNothing({
-        target: [contacts.userId, contacts.email],
+        target: [contacts.organizationId, contacts.email],
       })
       .returning({ id: contacts.id });
   }
@@ -197,10 +199,10 @@ export class ContactsController {
         });
       }
 
-      const inserted = await this.insertContacts(req.user!.userId, validRows);
+      const inserted = await this.insertContacts(req.user!.userId, req.user!.organizationId, validRows);
 
       void fireNewSubscriberAutomations(
-        req.user!.userId,
+        req.user!.organizationId,
         inserted.map((row) => row.id),
       );
 
@@ -242,10 +244,10 @@ export class ContactsController {
         });
       }
 
-      const inserted = await this.insertContacts(req.user!.userId, validRows);
+      const inserted = await this.insertContacts(req.user!.userId, req.user!.organizationId, validRows);
 
       void fireNewSubscriberAutomations(
-        req.user!.userId,
+        req.user!.organizationId,
         inserted.map((row) => row.id),
       );
 
