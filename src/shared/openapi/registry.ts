@@ -411,6 +411,31 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/t/o/{sendEventId}",
+  tags: ["Tracking"],
+  summary: "Pixel publico de rastreamento de abertura (carregado pelo cliente de email)",
+  request: { params: z.object({ sendEventId: z.string() }) },
+  responses: {
+    200: { description: "Imagem PNG 1x1" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/t/c/{sendEventId}",
+  tags: ["Tracking"],
+  summary: "Redirecionador publico de rastreamento de clique (clicado a partir do email)",
+  request: {
+    params: z.object({ sendEventId: z.string().uuid() }),
+    query: z.object({ u: z.string() }),
+  },
+  responses: {
+    302: { description: "Redireciona para a URL real" },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Billing
 // ---------------------------------------------------------------------------
@@ -710,5 +735,72 @@ registry.registerPath({
   responses: {
     204: { description: "Todas marcadas como lidas" },
     401: errorResponse("Nao autenticado"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Automations
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/automations",
+  tags: ["Automations"],
+  summary: "Lista as automacoes do usuario",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Automacoes", content: { "application/json": { schema: z.object({ automations: z.array(z.object({})) }) } } },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/automations",
+  tags: ["Automations"],
+  summary: "Cria uma automacao vazia (rascunho)",
+  security: bearerAuth,
+  responses: {
+    201: { description: "Automacao criada", content: { "application/json": { schema: z.object({ automation: z.object({}) }) } } },
+    401: errorResponse("Nao autenticado"),
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/automations/{id}",
+  tags: ["Automations"],
+  summary: "Detalhe de uma automacao (com nodes e edges)",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    200: { description: "Automacao", content: { "application/json": { schema: z.object({ automation: z.object({}) }) } } },
+    404: errorResponse("Automacao nao encontrada"),
+  },
+});
+
+registry.registerPath({
+  method: "put",
+  path: "/api/automations/{id}",
+  tags: ["Automations"],
+  summary: "Salva o grafo completo de uma automacao",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    200: { description: "Automacao salva", content: { "application/json": { schema: z.object({ automation: z.object({}) }) } } },
+    404: errorResponse("Automacao nao encontrada"),
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/automations/{id}",
+  tags: ["Automations"],
+  summary: "Remove uma automacao",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    204: { description: "Removida" },
+    404: errorResponse("Automacao nao encontrada"),
   },
 });

@@ -4,6 +4,7 @@ import { db } from "../database/index.js";
 import { newsletters, contacts, users } from "../database/schema/schema.js";
 import { ResendEmailProvider } from "../shared/email/resend.provider.js";
 import { personalizeContent } from "../shared/newsletter/personalize.js";
+import { injectTracking } from "../shared/email/tracking-injector.js";
 import { getRedisConnection } from "./redis-connection.js";
 import {
   NEWSLETTER_SEND_QUEUE,
@@ -35,7 +36,7 @@ function buildEmailHtml(content: string, unsubscribeUrl: string): string {
 }
 
 async function processJob(job: Job<NewsletterSendJobData>) {
-  const { newsletterId, userId } = job.data;
+  const { newsletterId, userId, contactId, trackingSendEventId } = job.data;
 
   const [newsletter] = await db
     .select()
@@ -56,12 +57,11 @@ async function processJob(job: Job<NewsletterSendJobData>) {
   const senderName = sender ? `${sender.name} ${sender.lastName}`.trim() : undefined;
   const sendDate = new Date().toLocaleDateString("pt-BR");
 
-  const recipients = await db
-    .select()
-    .from(contacts)
-    .where(
-      and(eq(contacts.userId, newsletter.userId), eq(contacts.status, "subscribed")),
-    );
+  const recipientsWhere = contactId
+    ? and(eq(contacts.userId, newsletter.userId), eq(contacts.id, contactId), eq(contacts.status, "subscribed"))
+    : and(eq(contacts.userId, newsletter.userId), eq(contacts.status, "subscribed"));
+
+  const recipients = await db.select().from(contacts).where(recipientsWhere);
 
   const emailProvider = new ResendEmailProvider();
   let sent = 0;
@@ -78,10 +78,14 @@ async function processJob(job: Job<NewsletterSendJobData>) {
       };
       const personalizedContent = personalizeContent(newsletter.content, personalizationData);
       const personalizedSubject = personalizeContent(newsletter.title, personalizationData);
+      let html = buildEmailHtml(personalizedContent, unsubscribeUrl);
+      if (trackingSendEventId) {
+        html = injectTracking(html, trackingSendEventId, API_PUBLIC_URL);
+      }
       await emailProvider.send({
         to: contact.email,
         subject: personalizedSubject,
-        html: buildEmailHtml(personalizedContent, unsubscribeUrl),
+        html,
         headers: {
           "List-Unsubscribe": `<${unsubscribeUrl}>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
@@ -97,14 +101,16 @@ async function processJob(job: Job<NewsletterSendJobData>) {
     }
   }
 
-  await db
-    .update(newsletters)
-    .set({ status: "sent", sentAt: new Date(), recipientCount: sent, updatedAt: new Date() })
-    .where(eq(newsletters.id, newsletterId));
+  if (!contactId) {
+    await db
+      .update(newsletters)
+      .set({ status: "sent", sentAt: new Date(), recipientCount: sent, updatedAt: new Date() })
+      .where(eq(newsletters.id, newsletterId));
 
-  logger.info({ newsletterId, userId, sent, failed }, "Newsletter send finished");
+    await createNotification({ userId, type: "newsletter_sent", newsletterId });
+  }
 
-  await createNotification({ userId, type: "newsletter_sent", newsletterId });
+  logger.info({ newsletterId, userId, contactId, sent, failed }, "Newsletter send finished");
 }
 
 export function startNewsletterSendWorker(): Worker<NewsletterSendJobData> {
