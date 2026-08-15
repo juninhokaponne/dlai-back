@@ -6,6 +6,7 @@ import { db } from "../../database/index.js";
 import { contacts } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { contactRowSchema } from "./contact.schema.js";
+import { fireNewSubscriberAutomations } from "../../shared/automations/contact-triggers.js";
 
 const MAX_ROWS = 20_000;
 const MAX_INVALID_SAMPLES = 20;
@@ -107,6 +108,8 @@ export class ContactsController {
         })
         .returning();
 
+      void fireNewSubscriberAutomations(req.user!.userId, [contact!.id]);
+
       return res.status(201).json({ contact });
     } catch (err) {
       next(err);
@@ -196,6 +199,11 @@ export class ContactsController {
 
       const inserted = await this.insertContacts(req.user!.userId, validRows);
 
+      void fireNewSubscriberAutomations(
+        req.user!.userId,
+        inserted.map((row) => row.id),
+      );
+
       return res.status(201).json({
         imported: inserted.length,
         skippedDuplicates: validRows.length - inserted.length,
@@ -235,6 +243,11 @@ export class ContactsController {
       }
 
       const inserted = await this.insertContacts(req.user!.userId, validRows);
+
+      void fireNewSubscriberAutomations(
+        req.user!.userId,
+        inserted.map((row) => row.id),
+      );
 
       return res.status(201).json({
         imported: inserted.length,

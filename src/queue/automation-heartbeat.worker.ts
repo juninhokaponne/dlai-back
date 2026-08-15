@@ -8,34 +8,17 @@ import {
   automationSendEvents,
   contacts,
   newsletters,
-  templates,
   users,
 } from "../database/schema/schema.js";
 import { getRedisConnection } from "./redis-connection.js";
 import { AUTOMATION_HEARTBEAT_QUEUE } from "./automation-heartbeat.queue.js";
 import { computeNextRunAt, type RecurringSchedule } from "../shared/automations/schedule.js";
 import { decideNextStep, type GraphEdge, type GraphNode, type SendEventState } from "../shared/automations/graph-walk.js";
+import { findNodeByTriggerSubtype, startRunForContacts } from "../shared/automations/run-orchestration.js";
 import { getNewsletterSendQueue } from "./newsletter-send.queue.js";
-import { createNewsletter, startNewsletterGeneration } from "../modules/newsletter/newsletter.service.js";
-import { InsufficientCreditsError } from "../shared/billing/billing.errors.js";
-import { createNotification } from "../shared/notifications/notifications.service.js";
 import { createLogger } from "../shared/logger/logger.js";
 
 const logger = createLogger("automation-heartbeat.worker");
-
-function findRecurringScheduleTrigger(nodes: GraphNode[]): GraphNode | undefined {
-  return nodes.find((node) => node.type === "trigger" && node.data.subtype === "recurring_schedule");
-}
-
-function findSendEmailNode(nodes: GraphNode[]): GraphNode | undefined {
-  return nodes.find((node) => node.type === "action" && node.data.subtype === "send_email");
-}
-
-function firstNodeAfter(nodeId: string, nodes: GraphNode[], edges: GraphEdge[]): GraphNode | undefined {
-  const edge = edges.find((candidate) => candidate.source === nodeId);
-  if (!edge) return undefined;
-  return nodes.find((node) => node.id === edge.target);
-}
 
 async function claimDueAutomations(): Promise<(typeof automations.$inferSelect)[]> {
   const now = new Date();
@@ -48,7 +31,7 @@ async function claimDueAutomations(): Promise<(typeof automations.$inferSelect)[
 
   for (const automation of due) {
     const nodes = automation.nodes as GraphNode[];
-    const trigger = findRecurringScheduleTrigger(nodes);
+    const trigger = findNodeByTriggerSubtype(nodes, "recurring_schedule");
     const rawConfig = trigger?.data.config;
     const schedule: RecurringSchedule | undefined = rawConfig?.time
       ? { time: rawConfig.time, days: JSON.parse(rawConfig.days ?? "[]") }
@@ -71,104 +54,16 @@ async function claimDueAutomations(): Promise<(typeof automations.$inferSelect)[
   return claimed;
 }
 
-async function resolveRunContent(
-  automation: typeof automations.$inferSelect,
-  sendEmailNode: GraphNode,
-): Promise<{ newsletterId: string } | null> {
-  const config = sendEmailNode.data.config ?? {};
-  const contentMode = config.contentMode ?? "existing";
-
-  if (contentMode === "generate") {
-    const topic = config.topic?.trim();
-    if (!topic) return null;
-
-    try {
-      const newsletter = await createNewsletter(automation.userId, topic);
-      await startNewsletterGeneration(newsletter.id, automation.userId);
-      return { newsletterId: newsletter.id };
-    } catch (err) {
-      if (err instanceof InsufficientCreditsError) {
-        await db
-          .update(automations)
-          .set({ status: "draft", nextRunAt: null, updatedAt: new Date() })
-          .where(eq(automations.id, automation.id));
-        await createNotification({ userId: automation.userId, type: "automation_paused_insufficient_credits" });
-        return null;
-      }
-      logger.error({ err, automationId: automation.id }, "Failed to start automation content generation");
-      await createNotification({ userId: automation.userId, type: "automation_run_failed" });
-      return null;
-    }
-  }
-
-  if (config.contentType === "newsletter" && config.contentId) {
-    const [existing] = await db
-      .select({ status: newsletters.status })
-      .from(newsletters)
-      .where(eq(newsletters.id, config.contentId))
-      .limit(1);
-    if (!existing || (existing.status !== "ready" && existing.status !== "sent")) return null;
-    return { newsletterId: config.contentId };
-  }
-
-  if (config.contentType === "template" && config.contentId) {
-    const [template] = await db.select().from(templates).where(eq(templates.id, config.contentId)).limit(1);
-    if (!template) return null;
-
-    const [newsletter] = await db
-      .insert(newsletters)
-      .values({
-        userId: automation.userId,
-        topic: template.name,
-        title: template.name,
-        content: template.contentHtml,
-        status: "ready",
-      })
-      .returning();
-
-    return { newsletterId: newsletter!.id };
-  }
-
-  return null;
-}
-
 export async function startRun(automation: typeof automations.$inferSelect): Promise<void> {
-  const nodes = automation.nodes as GraphNode[];
-  const edges = automation.edges as GraphEdge[];
-  const trigger = findRecurringScheduleTrigger(nodes);
-  if (!trigger) return;
-
-  const startNode = firstNodeAfter(trigger.id, nodes, edges);
-  if (!startNode) return;
-
-  const sendEmailNode = findSendEmailNode(nodes);
-  const content = sendEmailNode ? await resolveRunContent(automation, sendEmailNode) : null;
-  if (sendEmailNode && !content) return;
-
   const recipients = await db
     .select({ id: contacts.id })
     .from(contacts)
     .where(and(eq(contacts.userId, automation.userId), eq(contacts.status, "subscribed")));
 
-  if (recipients.length === 0) return;
-
-  const [run] = await db
-    .insert(automationRuns)
-    .values({
-      automationId: automation.id,
-      newsletterId: content?.newsletterId,
-      status: "running",
-    })
-    .returning();
-
-  await db.insert(automationRunContacts).values(
-    recipients.map((contact) => ({
-      runId: run!.id,
-      automationId: automation.id,
-      contactId: contact.id,
-      currentNodeId: startNode.id,
-      status: "pending" as const,
-    })),
+  await startRunForContacts(
+    automation,
+    "recurring_schedule",
+    recipients.map((contact) => contact.id),
   );
 }
 
