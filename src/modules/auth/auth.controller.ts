@@ -5,8 +5,11 @@ import {
   refreshTokens,
   users,
   creditTransactions,
+  organizations,
+  organizationMembers,
 } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
+import { getMembership } from "../../shared/organizations/organizations.service.js";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
 import { SpacesStorageProvider } from "../../shared/storage/spaces.provider.js";
 import {
@@ -86,19 +89,36 @@ export class AuthController {
           .values({ name, lastName, age, company, email, passwordHash, locale: userLocale })
           .returning();
 
+        const [organization] = await tx
+          .insert(organizations)
+          .values({ name: company?.trim() || `${name}'s workspace` })
+          .returning();
+
+        await tx.insert(organizationMembers).values({
+          organizationId: organization!.id,
+          userId: created!.id,
+          role: "admin",
+        });
+
         await tx.insert(creditTransactions).values({
           userId: created!.id,
+          organizationId: organization!.id,
           amount: TRIAL_CREDITS,
           reason: "trial_grant",
         });
 
-        return created;
+        return { ...created!, organizationId: organization!.id };
       });
 
       // No auth middleware runs on this route (the user doesn't exist yet
       // when the request starts), so attach the identity we just created
       // for the request-completion log line to pick up.
-      (req as AuthenticatedRequest).user = { userId: newUser!.id, email: newUser!.email };
+      (req as AuthenticatedRequest).user = {
+        userId: newUser.id,
+        email: newUser.email,
+        organizationId: newUser.organizationId,
+        role: "admin",
+      };
 
       createVerificationToken(newUser!.id)
         .then((token) =>
@@ -147,9 +167,16 @@ export class AuthController {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      const membership = await getMembership(user.id);
+      if (!membership) {
+        throw new Error(`User ${user.id} has no organization membership.`);
+      }
+
       const accessToken = generateAccessToken({
         userId: user.id,
         email: user.email,
+        organizationId: membership.organizationId,
+        role: membership.role,
       });
       const rawRefreshToken = generateRefreshTokenRaw();
       const expiresAt = refreshTokenExpiry();
@@ -167,7 +194,12 @@ export class AuthController {
 
       // Same reasoning as register(): requireAuth never runs on this route,
       // so attach the identity for the request-completion log line.
-      (req as AuthenticatedRequest).user = { userId: user.id, email: user.email };
+      (req as AuthenticatedRequest).user = {
+        userId: user.id,
+        email: user.email,
+        organizationId: membership.organizationId,
+        role: membership.role,
+      };
 
       return res.json({
         accessToken,
@@ -211,9 +243,19 @@ export class AuthController {
         return res.status(401).json({ error: "Invalid refresh token." });
       }
 
+      const membership = await getMembership(user.id);
+      if (!membership) {
+        throw new Error(`User ${user.id} has no organization membership.`);
+      }
+
       // Same reasoning as register()/login(): requireAuth never runs on
       // this route, so attach the identity for the request-completion log.
-      (req as AuthenticatedRequest).user = { userId: user.id, email: user.email };
+      (req as AuthenticatedRequest).user = {
+        userId: user.id,
+        email: user.email,
+        organizationId: membership.organizationId,
+        role: membership.role,
+      };
 
       await db
         .update(refreshTokens)
@@ -237,6 +279,8 @@ export class AuthController {
       const accessToken = generateAccessToken({
         userId: user.id,
         email: user.email,
+        organizationId: membership.organizationId,
+        role: membership.role,
       });
 
       return res.json({ accessToken });

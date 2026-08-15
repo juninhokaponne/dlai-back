@@ -12,7 +12,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "docker:migrate": "docker compose --profile tools run --build --rm migrate",
-    "stripe:setup-plans": "tsx scripts/setup-stripe-plans.ts"
+    "stripe:setup-plans": "tsx scripts/setup-stripe-plans.ts",
+    "migrate:organizations": "tsx scripts/migrate-users-to-organizations.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
