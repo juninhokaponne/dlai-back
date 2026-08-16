@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { parse } from "csv-parse/sync";
-import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
 import { contacts, contactTags, tags } from "../../database/schema/schema.js";
@@ -54,13 +54,21 @@ export class ContactsController {
       const limit = Math.min(Number(req.query.limit) || 100, 500);
       const offset = Math.max(Number(req.query.offset) || 0, 0);
       const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const tagIdFilter = idParamSchema.safeParse(req.query.tagId);
 
-      const whereClause = search
-        ? and(
-            eq(contacts.organizationId, req.user!.organizationId),
-            or(ilike(contacts.email, `%${search}%`), ilike(contacts.name, `%${search}%`)),
-          )
-        : eq(contacts.organizationId, req.user!.organizationId);
+      const conditions = [eq(contacts.organizationId, req.user!.organizationId)];
+      if (search) {
+        conditions.push(or(ilike(contacts.email, `%${search}%`), ilike(contacts.name, `%${search}%`))!);
+      }
+      if (tagIdFilter.success) {
+        conditions.push(
+          inArray(
+            contacts.id,
+            db.select({ id: contactTags.contactId }).from(contactTags).where(eq(contactTags.tagId, tagIdFilter.data)),
+          ),
+        );
+      }
+      const whereClause = and(...conditions);
 
       const [rows, total] = await Promise.all([
         db
@@ -73,7 +81,30 @@ export class ContactsController {
         db.$count(contacts, whereClause),
       ]);
 
-      return res.json({ contacts: rows, total, limit, offset });
+      const contactTagRows =
+        rows.length > 0
+          ? await db
+              .select({ contactId: contactTags.contactId, id: tags.id, name: tags.name })
+              .from(contactTags)
+              .innerJoin(tags, eq(contactTags.tagId, tags.id))
+              .where(
+                inArray(
+                  contactTags.contactId,
+                  rows.map((row) => row.id),
+                ),
+              )
+          : [];
+
+      const tagsByContactId = new Map<string, { id: string; name: string }[]>();
+      for (const row of contactTagRows) {
+        const existing = tagsByContactId.get(row.contactId) ?? [];
+        existing.push({ id: row.id, name: row.name });
+        tagsByContactId.set(row.contactId, existing);
+      }
+
+      const contactsWithTags = rows.map((row) => ({ ...row, tags: tagsByContactId.get(row.id) ?? [] }));
+
+      return res.json({ contacts: contactsWithTags, total, limit, offset });
     } catch (err) {
       next(err);
     }
