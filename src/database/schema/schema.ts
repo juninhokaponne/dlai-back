@@ -10,6 +10,7 @@ import {
   pgEnum,
   unique,
   jsonb,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { TRIAL_CREDITS } from "../../shared/billing/credits.config.js";
@@ -207,7 +208,7 @@ export const contacts = pgTable(
   (table) => [unique("contacts_organization_id_email_unique").on(table.organizationId, table.email)],
 );
 
-export const contactsRelations = relations(contacts, ({ one }) => ({
+export const contactsRelations = relations(contacts, ({ one, many }) => ({
   user: one(users, {
     fields: [contacts.userId],
     references: [users.id],
@@ -215,6 +216,47 @@ export const contactsRelations = relations(contacts, ({ one }) => ({
   organization: one(organizations, {
     fields: [contacts.organizationId],
     references: [organizations.id],
+  }),
+  contactTags: many(contactTags),
+}));
+
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [unique("tags_organization_id_name_unique").on(table.organizationId, table.name)],
+);
+
+export const tagsRelations = relations(tags, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [tags.organizationId],
+    references: [organizations.id],
+  }),
+  contactTags: many(contactTags),
+}));
+
+export const contactTags = pgTable(
+  "contact_tags",
+  {
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "cascade" }).notNull(),
+    tagId: uuid("tag_id").references(() => tags.id, { onDelete: "cascade" }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.contactId, table.tagId] })],
+);
+
+export const contactTagsRelations = relations(contactTags, ({ one }) => ({
+  contact: one(contacts, {
+    fields: [contactTags.contactId],
+    references: [contacts.id],
+  }),
+  tag: one(tags, {
+    fields: [contactTags.tagId],
+    references: [tags.id],
   }),
 }));
 
