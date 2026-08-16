@@ -49,6 +49,17 @@ function parsePastedContactLine(line: string): Record<string, string> {
 }
 
 export class ContactsController {
+  constructor() {
+    // These three call private helper methods via `this.` internally, and
+    // Express registers controller methods as bare function references
+    // (`controller.create`, not `controller.create.bind(controller)`) — so
+    // without this, `this` is `undefined` at call time and every request
+    // through these three handlers throws.
+    this.create = this.create.bind(this);
+    this.import = this.import.bind(this);
+    this.importText = this.importText.bind(this);
+  }
+
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const limit = Math.min(Number(req.query.limit) || 100, 500);
@@ -112,7 +123,7 @@ export class ContactsController {
 
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { email, name } = req.body;
+      const { email, name, tagId } = req.body;
 
       const totalContacts = await db.$count(contacts, eq(contacts.organizationId, req.user!.organizationId));
       if (totalContacts >= MAX_MANUAL_CONTACTS) {
@@ -141,12 +152,43 @@ export class ContactsController {
         })
         .returning();
 
+      if (tagId) {
+        await this.applyTagIfOwned(req.user!.organizationId, [contact!.id], tagId);
+      }
+
       void fireNewSubscriberAutomations(req.user!.organizationId, [contact!.id]);
 
       return res.status(201).json({ contact });
     } catch (err) {
       next(err);
     }
+  }
+
+  private async applyTagIfOwned(organizationId: string, contactIds: string[], tagId: string): Promise<void> {
+    const [tag] = await db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(and(eq(tags.id, tagId), eq(tags.organizationId, organizationId)))
+      .limit(1);
+    if (!tag || contactIds.length === 0) return;
+
+    await db
+      .insert(contactTags)
+      .values(contactIds.map((contactId) => ({ contactId, tagId: tag.id })))
+      .onConflictDoNothing();
+  }
+
+  private async resolveContactIdsForRows(
+    organizationId: string,
+    validRows: z.infer<typeof contactRowSchema>[],
+  ): Promise<string[]> {
+    if (validRows.length === 0) return [];
+    const emails = validRows.map((row) => row.email);
+    const rows = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(and(eq(contacts.organizationId, organizationId), inArray(contacts.email, emails)));
+    return rows.map((row) => row.id);
   }
 
   private extractValidRows(records: Record<string, string>[], rowNumberFor: (index: number) => number) {
@@ -233,6 +275,12 @@ export class ContactsController {
 
       const inserted = await this.insertContacts(req.user!.userId, req.user!.organizationId, validRows);
 
+      const parsedTagId = idParamSchema.safeParse(req.body.tagId);
+      if (parsedTagId.success) {
+        const matchedIds = await this.resolveContactIdsForRows(req.user!.organizationId, validRows);
+        await this.applyTagIfOwned(req.user!.organizationId, matchedIds, parsedTagId.data);
+      }
+
       void fireNewSubscriberAutomations(
         req.user!.organizationId,
         inserted.map((row) => row.id),
@@ -277,6 +325,12 @@ export class ContactsController {
       }
 
       const inserted = await this.insertContacts(req.user!.userId, req.user!.organizationId, validRows);
+
+      const parsedTagId = idParamSchema.safeParse(req.body.tagId);
+      if (parsedTagId.success) {
+        const matchedIds = await this.resolveContactIdsForRows(req.user!.organizationId, validRows);
+        await this.applyTagIfOwned(req.user!.organizationId, matchedIds, parsedTagId.data);
+      }
 
       void fireNewSubscriberAutomations(
         req.user!.organizationId,

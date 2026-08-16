@@ -16,7 +16,7 @@ import {
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
 import { workspaceGenerateSchema, workspaceTextActionSchema } from "../../modules/workspace/workspace.schema.js";
-import { contactRowSchema, importTextSchema, bulkTagSchema } from "../../modules/contacts/contact.schema.js";
+import { importTextSchema, bulkTagSchema, createContactSchema } from "../../modules/contacts/contact.schema.js";
 import { createTemplateSchema, generateTemplateSchema } from "../../modules/templates/template.schema.js";
 import {
   acceptInviteSchema,
@@ -365,7 +365,7 @@ registry.registerPath({
   tags: ["Contacts"],
   summary: "Adiciona um contact manualmente",
   security: bearerAuth,
-  request: { body: { content: { "application/json": { schema: contactRowSchema } } } },
+  request: { body: { content: { "application/json": { schema: createContactSchema } } } },
   responses: {
     201: { description: "Contact criado", content: { "application/json": { schema: z.object({ contact: z.object({}) }) } } },
     409: errorResponse("Contact ja existe"),
