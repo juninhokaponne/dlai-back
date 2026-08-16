@@ -9,7 +9,7 @@ const controller = new BillingController();
 
 router.get("/plans", controller.listPlans);
 router.get("/subscription", requireAuth, controller.getSubscription);
-router.get("/invoices", requireAuth, controller.listInvoices);
+router.get("/invoices", requireAuth, requireRole("admin"), controller.listInvoices);
 router.post("/cancel", requireAuth, requireRole("admin"), controller.cancelSubscription);
 router.post("/checkout", requireAuth, requireRole("admin"), validate(checkoutSchema), controller.checkout);
 

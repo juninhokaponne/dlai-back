@@ -503,11 +503,12 @@ registry.registerPath({
   method: "get",
   path: "/api/billing/invoices",
   tags: ["Billing"],
-  summary: "Historico de faturas do usuario (buscado direto do Stripe)",
+  summary: "Historico de faturas da organizacao, buscado direto do Stripe (somente admin)",
   security: bearerAuth,
   responses: {
     200: { description: "Faturas", content: { "application/json": { schema: z.object({ invoices: z.array(z.object({})) }) } } },
     401: errorResponse("Nao autenticado"),
+    403: errorResponse("Somente admins podem ver o historico de pagamentos"),
   },
 });
 
