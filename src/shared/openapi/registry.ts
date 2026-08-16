@@ -18,6 +18,11 @@ import { checkoutSchema } from "../../modules/billing/billing.schema.js";
 import { workspaceGenerateSchema, workspaceTextActionSchema } from "../../modules/workspace/workspace.schema.js";
 import { contactRowSchema, importTextSchema } from "../../modules/contacts/contact.schema.js";
 import { createTemplateSchema, generateTemplateSchema } from "../../modules/templates/template.schema.js";
+import {
+  acceptInviteSchema,
+  inviteMemberSchema,
+  updateMemberRoleSchema,
+} from "../../modules/organizations/organizations.schema.js";
 
 extendZodWithOpenApi(z);
 
@@ -828,5 +833,115 @@ registry.registerPath({
   responses: {
     200: { description: "Contatos da execucao", content: { "application/json": { schema: z.object({ contacts: z.array(z.object({})) }) } } },
     404: errorResponse("Execucao nao encontrada"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Organizations
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/organizations/members",
+  tags: ["Organizations"],
+  summary: "Lista os membros da organizacao e convites pendentes (convites apenas para admins)",
+  security: bearerAuth,
+  responses: {
+    200: {
+      description: "Membros e convites",
+      content: { "application/json": { schema: z.object({ members: z.array(z.object({})), invites: z.array(z.object({})) }) } },
+    },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/organizations/invites",
+  tags: ["Organizations"],
+  summary: "Convida um novo membro por email (somente admin)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: inviteMemberSchema } } } },
+  responses: {
+    201: { description: "Convite criado", content: { "application/json": { schema: z.object({ invite: z.object({}) }) } } },
+    409: errorResponse("Email ja pertence a uma conta existente"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/organizations/invites/{inviteId}/revoke",
+  tags: ["Organizations"],
+  summary: "Revoga um convite pendente (somente admin)",
+  security: bearerAuth,
+  request: { params: z.object({ inviteId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Convite revogado" },
+    404: errorResponse("Convite nao encontrado"),
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/organizations/invites/token/{token}",
+  tags: ["Organizations"],
+  summary: "Consulta publica dos dados de um convite pelo token",
+  request: { params: z.object({ token: z.string() }) },
+  responses: {
+    200: {
+      description: "Dados do convite",
+      content: {
+        "application/json": {
+          schema: z.object({ email: z.string(), role: z.string(), organizationName: z.string(), status: z.string() }),
+        },
+      },
+    },
+    404: errorResponse("Convite invalido"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/organizations/invites/token/{token}/accept",
+  tags: ["Organizations"],
+  summary: "Aceita um convite, cria a conta e entra na organizacao",
+  request: {
+    params: z.object({ token: z.string() }),
+    body: { content: { "application/json": { schema: acceptInviteSchema } } },
+  },
+  responses: {
+    201: { description: "Conta criada" },
+    400: errorResponse("Convite invalido ou expirado"),
+    409: errorResponse("Conta ja existe para este email"),
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/organizations/members/{userId}/role",
+  tags: ["Organizations"],
+  summary: "Altera o papel de um membro (somente admin)",
+  security: bearerAuth,
+  request: {
+    params: z.object({ userId: z.string().uuid() }),
+    body: { content: { "application/json": { schema: updateMemberRoleSchema } } },
+  },
+  responses: {
+    200: { description: "Papel atualizado" },
+    400: errorResponse("Organizacao precisa manter pelo menos um admin"),
+    404: errorResponse("Membro nao encontrado"),
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/organizations/members/{userId}",
+  tags: ["Organizations"],
+  summary: "Remove um membro da organizacao (somente admin)",
+  security: bearerAuth,
+  request: { params: z.object({ userId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Membro removido" },
+    400: errorResponse("Organizacao precisa manter pelo menos um admin"),
+    404: errorResponse("Membro nao encontrado"),
   },
 });

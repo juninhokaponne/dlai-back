@@ -11,6 +11,7 @@ const ACCESS_TOKEN_TTL = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const EMAIL_VERIFICATION_TTL_HOURS = 48;
 const PASSWORD_RESET_TTL_HOURS = 1;
+const INVITE_TTL_DAYS = 7;
 
 export async function hashPassword(password: string): Promise<string> {
   return await hash(password, {
@@ -78,5 +79,11 @@ export function verificationTokenExpiry(): Date {
 export function passwordResetTokenExpiry(): Date {
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + PASSWORD_RESET_TTL_HOURS);
+  return expiresAt;
+}
+
+export function inviteTokenExpiry(): Date {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + INVITE_TTL_DAYS);
   return expiresAt;
 }
