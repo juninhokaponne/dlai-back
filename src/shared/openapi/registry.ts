@@ -16,7 +16,7 @@ import {
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
 import { workspaceGenerateSchema, workspaceTextActionSchema } from "../../modules/workspace/workspace.schema.js";
-import { contactRowSchema, importTextSchema } from "../../modules/contacts/contact.schema.js";
+import { importTextSchema, bulkTagSchema, createContactSchema } from "../../modules/contacts/contact.schema.js";
 import { createTemplateSchema, generateTemplateSchema } from "../../modules/templates/template.schema.js";
 import {
   acceptInviteSchema,
@@ -24,6 +24,7 @@ import {
   updateMemberRoleSchema,
   updateOrganizationSchema,
 } from "../../modules/organizations/organizations.schema.js";
+import { createTagSchema } from "../../modules/tags/tags.schema.js";
 
 extendZodWithOpenApi(z);
 
@@ -352,6 +353,7 @@ registry.registerPath({
     query: z.object({
       limit: z.string().optional().openapi({ description: "Padrao 100, maximo 500" }),
       offset: z.string().optional(),
+      tagId: z.string().uuid().optional().openapi({ description: "Filtra contacts que tem essa tag" }),
     }),
   },
   responses: { 200: { description: "Lista de contacts", content: { "application/json": { schema: z.object({ contacts: z.array(z.object({})) }) } } } },
@@ -363,7 +365,7 @@ registry.registerPath({
   tags: ["Contacts"],
   summary: "Adiciona um contact manualmente",
   security: bearerAuth,
-  request: { body: { content: { "application/json": { schema: contactRowSchema } } } },
+  request: { body: { content: { "application/json": { schema: createContactSchema } } } },
   responses: {
     201: { description: "Contact criado", content: { "application/json": { schema: z.object({ contact: z.object({}) }) } } },
     409: errorResponse("Contact ja existe"),
@@ -414,6 +416,48 @@ registry.registerPath({
     200: { description: "Descadastrado com sucesso (HTML)" },
     400: { description: "Token invalido (HTML)" },
     404: { description: "Contato nao encontrado (HTML)" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/contacts/{id}/tags",
+  tags: ["Contacts"],
+  summary: "Aplica uma tag a um contact",
+  security: bearerAuth,
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: { content: { "application/json": { schema: z.object({ tagId: z.string().uuid() }) } } },
+  },
+  responses: {
+    201: { description: "Tag aplicada" },
+    404: errorResponse("Contact ou tag nao encontrado"),
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/contacts/{id}/tags/{tagId}",
+  tags: ["Contacts"],
+  summary: "Remove uma tag de um contact",
+  security: bearerAuth,
+  request: { params: z.object({ id: z.string().uuid(), tagId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Tag removida" },
+    404: errorResponse("Contact nao encontrado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/contacts/bulk-tag",
+  tags: ["Contacts"],
+  summary: "Aplica uma tag a varios contacts de uma vez",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: bulkTagSchema } } } },
+  responses: {
+    200: { description: "Contatos marcados", content: { "application/json": { schema: z.object({ tagged: z.number() }) } } },
+    404: errorResponse("Tag nao encontrada"),
   },
 });
 
@@ -957,5 +1001,46 @@ registry.registerPath({
     200: { description: "Membro removido" },
     400: errorResponse("Organizacao precisa manter pelo menos um admin"),
     404: errorResponse("Membro nao encontrado"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Tags
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/tags",
+  tags: ["Tags"],
+  summary: "Lista as tags da organizacao",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Tags", content: { "application/json": { schema: z.object({ tags: z.array(z.object({})) }) } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/tags",
+  tags: ["Tags"],
+  summary: "Cria uma tag, ou retorna a existente se o nome ja existir na organizacao",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: createTagSchema } } } },
+  responses: {
+    200: { description: "Tag ja existia", content: { "application/json": { schema: z.object({ tag: z.object({}) }) } } },
+    201: { description: "Tag criada", content: { "application/json": { schema: z.object({ tag: z.object({}) }) } } },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/tags/{id}",
+  tags: ["Tags"],
+  summary: "Remove uma tag (remove tambem de todos os contatos que a tinham)",
+  security: bearerAuth,
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: { description: "Tag removida" },
+    404: errorResponse("Tag nao encontrada"),
   },
 });

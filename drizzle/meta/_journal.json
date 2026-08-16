@@ -169,6 +169,13 @@
       "when": 1786823998452,
       "tag": "0023_last_gabe_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786909830390,
+      "tag": "0024_worthless_nehzno",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
 import { parse } from "csv-parse/sync";
-import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { contacts } from "../../database/schema/schema.js";
+import { contacts, contactTags, tags } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { contactRowSchema } from "./contact.schema.js";
 import { fireNewSubscriberAutomations } from "../../shared/automations/contact-triggers.js";
@@ -12,6 +12,7 @@ const MAX_ROWS = 20_000;
 const MAX_INVALID_SAMPLES = 20;
 const MAX_MANUAL_CONTACTS = 50;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const idParamSchema = z.string().uuid();
 
 function detectDelimiter(buffer: Buffer): string {
   const firstLine = buffer.toString("utf-8", 0, Math.min(buffer.length, 2000)).split(/\r?\n/)[0] ?? "";
@@ -48,18 +49,37 @@ function parsePastedContactLine(line: string): Record<string, string> {
 }
 
 export class ContactsController {
+  constructor() {
+    // These three call private helper methods via `this.` internally, and
+    // Express registers controller methods as bare function references
+    // (`controller.create`, not `controller.create.bind(controller)`) — so
+    // without this, `this` is `undefined` at call time and every request
+    // through these three handlers throws.
+    this.create = this.create.bind(this);
+    this.import = this.import.bind(this);
+    this.importText = this.importText.bind(this);
+  }
+
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const limit = Math.min(Number(req.query.limit) || 100, 500);
       const offset = Math.max(Number(req.query.offset) || 0, 0);
       const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const tagIdFilter = idParamSchema.safeParse(req.query.tagId);
 
-      const whereClause = search
-        ? and(
-            eq(contacts.organizationId, req.user!.organizationId),
-            or(ilike(contacts.email, `%${search}%`), ilike(contacts.name, `%${search}%`)),
-          )
-        : eq(contacts.organizationId, req.user!.organizationId);
+      const conditions = [eq(contacts.organizationId, req.user!.organizationId)];
+      if (search) {
+        conditions.push(or(ilike(contacts.email, `%${search}%`), ilike(contacts.name, `%${search}%`))!);
+      }
+      if (tagIdFilter.success) {
+        conditions.push(
+          inArray(
+            contacts.id,
+            db.select({ id: contactTags.contactId }).from(contactTags).where(eq(contactTags.tagId, tagIdFilter.data)),
+          ),
+        );
+      }
+      const whereClause = and(...conditions);
 
       const [rows, total] = await Promise.all([
         db
@@ -72,7 +92,30 @@ export class ContactsController {
         db.$count(contacts, whereClause),
       ]);
 
-      return res.json({ contacts: rows, total, limit, offset });
+      const contactTagRows =
+        rows.length > 0
+          ? await db
+              .select({ contactId: contactTags.contactId, id: tags.id, name: tags.name })
+              .from(contactTags)
+              .innerJoin(tags, eq(contactTags.tagId, tags.id))
+              .where(
+                inArray(
+                  contactTags.contactId,
+                  rows.map((row) => row.id),
+                ),
+              )
+          : [];
+
+      const tagsByContactId = new Map<string, { id: string; name: string }[]>();
+      for (const row of contactTagRows) {
+        const existing = tagsByContactId.get(row.contactId) ?? [];
+        existing.push({ id: row.id, name: row.name });
+        tagsByContactId.set(row.contactId, existing);
+      }
+
+      const contactsWithTags = rows.map((row) => ({ ...row, tags: tagsByContactId.get(row.id) ?? [] }));
+
+      return res.json({ contacts: contactsWithTags, total, limit, offset });
     } catch (err) {
       next(err);
     }
@@ -80,7 +123,7 @@ export class ContactsController {
 
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { email, name } = req.body;
+      const { email, name, tagId } = req.body;
 
       const totalContacts = await db.$count(contacts, eq(contacts.organizationId, req.user!.organizationId));
       if (totalContacts >= MAX_MANUAL_CONTACTS) {
@@ -109,12 +152,43 @@ export class ContactsController {
         })
         .returning();
 
+      if (tagId) {
+        await this.applyTagIfOwned(req.user!.organizationId, [contact!.id], tagId);
+      }
+
       void fireNewSubscriberAutomations(req.user!.organizationId, [contact!.id]);
 
       return res.status(201).json({ contact });
     } catch (err) {
       next(err);
     }
+  }
+
+  private async applyTagIfOwned(organizationId: string, contactIds: string[], tagId: string): Promise<void> {
+    const [tag] = await db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(and(eq(tags.id, tagId), eq(tags.organizationId, organizationId)))
+      .limit(1);
+    if (!tag || contactIds.length === 0) return;
+
+    await db
+      .insert(contactTags)
+      .values(contactIds.map((contactId) => ({ contactId, tagId: tag.id })))
+      .onConflictDoNothing();
+  }
+
+  private async resolveContactIdsForRows(
+    organizationId: string,
+    validRows: z.infer<typeof contactRowSchema>[],
+  ): Promise<string[]> {
+    if (validRows.length === 0) return [];
+    const emails = validRows.map((row) => row.email);
+    const rows = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(and(eq(contacts.organizationId, organizationId), inArray(contacts.email, emails)));
+    return rows.map((row) => row.id);
   }
 
   private extractValidRows(records: Record<string, string>[], rowNumberFor: (index: number) => number) {
@@ -201,6 +275,12 @@ export class ContactsController {
 
       const inserted = await this.insertContacts(req.user!.userId, req.user!.organizationId, validRows);
 
+      const parsedTagId = idParamSchema.safeParse(req.body.tagId);
+      if (parsedTagId.success) {
+        const matchedIds = await this.resolveContactIdsForRows(req.user!.organizationId, validRows);
+        await this.applyTagIfOwned(req.user!.organizationId, matchedIds, parsedTagId.data);
+      }
+
       void fireNewSubscriberAutomations(
         req.user!.organizationId,
         inserted.map((row) => row.id),
@@ -246,6 +326,12 @@ export class ContactsController {
 
       const inserted = await this.insertContacts(req.user!.userId, req.user!.organizationId, validRows);
 
+      const parsedTagId = idParamSchema.safeParse(req.body.tagId);
+      if (parsedTagId.success) {
+        const matchedIds = await this.resolveContactIdsForRows(req.user!.organizationId, validRows);
+        await this.applyTagIfOwned(req.user!.organizationId, matchedIds, parsedTagId.data);
+      }
+
       void fireNewSubscriberAutomations(
         req.user!.organizationId,
         inserted.map((row) => row.id),
@@ -284,6 +370,106 @@ export class ContactsController {
         .send(
           "<p>Voce foi descadastrado com sucesso e nao vai mais receber emails desta lista.</p>",
         );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async addTag(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedContactId = idParamSchema.safeParse(req.params.id);
+      const parsedTagId = idParamSchema.safeParse(req.body.tagId);
+      if (!parsedContactId.success || !parsedTagId.success) {
+        return res.status(400).json({ error: "Invalid contact or tag id." });
+      }
+
+      const [contact] = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.id, parsedContactId.data), eq(contacts.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found." });
+      }
+
+      const [tag] = await db
+        .select({ id: tags.id })
+        .from(tags)
+        .where(and(eq(tags.id, parsedTagId.data), eq(tags.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found." });
+      }
+
+      await db
+        .insert(contactTags)
+        .values({ contactId: contact.id, tagId: tag.id })
+        .onConflictDoNothing();
+
+      return res.status(201).json({ message: "Tag applied." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async removeTag(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedContactId = idParamSchema.safeParse(req.params.id);
+      const parsedTagId = idParamSchema.safeParse(req.params.tagId);
+      if (!parsedContactId.success || !parsedTagId.success) {
+        return res.status(400).json({ error: "Invalid contact or tag id." });
+      }
+
+      const [contact] = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.id, parsedContactId.data), eq(contacts.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found." });
+      }
+
+      await db
+        .delete(contactTags)
+        .where(and(eq(contactTags.contactId, parsedContactId.data), eq(contactTags.tagId, parsedTagId.data)));
+
+      return res.json({ message: "Tag removed." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async bulkTag(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { contactIds, tagId } = req.body as { contactIds: string[]; tagId: string };
+
+      const [tag] = await db
+        .select({ id: tags.id })
+        .from(tags)
+        .where(and(eq(tags.id, tagId), eq(tags.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found." });
+      }
+
+      const ownedContacts = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(
+          and(
+            eq(contacts.organizationId, req.user!.organizationId),
+            or(...contactIds.map((id) => eq(contacts.id, id))),
+          ),
+        );
+
+      if (ownedContacts.length > 0) {
+        await db
+          .insert(contactTags)
+          .values(ownedContacts.map((contact) => ({ contactId: contact.id, tagId: tag.id })))
+          .onConflictDoNothing();
+      }
+
+      return res.json({ tagged: ownedContacts.length });
     } catch (err) {
       next(err);
     }
