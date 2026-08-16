@@ -130,3 +130,67 @@ describe("OrganizationsController.acceptInvite", () => {
     expect(res.json).toHaveBeenCalledWith({ error: "This invite link has expired." });
   });
 });
+
+describe("OrganizationsController.updateMemberRole", () => {
+  let controller: InstanceType<typeof OrganizationsController>;
+  let req: any;
+  let res: any;
+  let next: jest.Mock;
+
+  beforeEach(() => {
+    controller = new OrganizationsController();
+    res = mockResponse();
+    next = jest.fn();
+  });
+
+  it("Should block demoting the last remaining admin", async () => {
+    req = mockRequest({
+      params: { userId: "00000000-0000-4000-8000-000000000001" },
+      body: { role: "member" },
+      user: { userId: "admin-1", email: "admin@teste.com", organizationId: "org-1", role: "admin" },
+    } as any);
+
+    (db.select as jest.Mock).mockReturnThis();
+    (db.from as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.limit as jest.Mock).mockResolvedValue([{ role: "admin" }]);
+    (db.$count as jest.Mock).mockResolvedValue(1);
+
+    await controller.updateMemberRole(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "An organization must have at least one Admin." });
+  });
+});
+
+describe("OrganizationsController.removeMember", () => {
+  let controller: InstanceType<typeof OrganizationsController>;
+  let req: any;
+  let res: any;
+  let next: jest.Mock;
+
+  beforeEach(() => {
+    controller = new OrganizationsController();
+    res = mockResponse();
+    next = jest.fn();
+  });
+
+  it("Should block removing the last remaining admin", async () => {
+    req = mockRequest({
+      params: { userId: "00000000-0000-4000-8000-000000000001" },
+      user: { userId: "admin-1", email: "admin@teste.com", organizationId: "org-1", role: "admin" },
+    } as any);
+
+    (db.select as jest.Mock).mockReturnThis();
+    (db.from as jest.Mock).mockReturnThis();
+    (db.innerJoin as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.limit as jest.Mock).mockResolvedValue([{ role: "admin", name: "Ana" }]);
+    (db.$count as jest.Mock).mockResolvedValue(1);
+
+    await controller.removeMember(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "An organization must have at least one Admin." });
+  });
+});

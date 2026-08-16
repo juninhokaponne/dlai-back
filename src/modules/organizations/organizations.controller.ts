@@ -290,4 +290,107 @@ export class OrganizationsController {
       next(err);
     }
   }
+
+  async updateMemberRole(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedUserId = idParamSchema.safeParse(req.params.userId);
+      if (!parsedUserId.success) {
+        return res.status(400).json({ error: "Invalid member id." });
+      }
+      const userId = parsedUserId.data;
+      const { role } = req.body;
+
+      const [target] = await db
+        .select({ role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.userId, userId),
+            eq(organizationMembers.organizationId, req.user!.organizationId),
+          ),
+        )
+        .limit(1);
+
+      if (!target) {
+        return res.status(404).json({ error: "Member not found." });
+      }
+
+      if (target.role === "admin" && role !== "admin") {
+        const adminCount = await db.$count(
+          organizationMembers,
+          and(
+            eq(organizationMembers.organizationId, req.user!.organizationId),
+            eq(organizationMembers.role, "admin"),
+          ),
+        );
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "An organization must have at least one Admin." });
+        }
+      }
+
+      await db.update(organizationMembers).set({ role }).where(eq(organizationMembers.userId, userId));
+
+      return res.json({ member: { userId, role } });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async removeMember(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedUserId = idParamSchema.safeParse(req.params.userId);
+      if (!parsedUserId.success) {
+        return res.status(400).json({ error: "Invalid member id." });
+      }
+      const userId = parsedUserId.data;
+
+      const [target] = await db
+        .select({ role: organizationMembers.role, name: users.name })
+        .from(organizationMembers)
+        .innerJoin(users, eq(organizationMembers.userId, users.id))
+        .where(
+          and(
+            eq(organizationMembers.userId, userId),
+            eq(organizationMembers.organizationId, req.user!.organizationId),
+          ),
+        )
+        .limit(1);
+
+      if (!target) {
+        return res.status(404).json({ error: "Member not found." });
+      }
+
+      if (target.role === "admin") {
+        const adminCount = await db.$count(
+          organizationMembers,
+          and(
+            eq(organizationMembers.organizationId, req.user!.organizationId),
+            eq(organizationMembers.role, "admin"),
+          ),
+        );
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "An organization must have at least one Admin." });
+        }
+      }
+
+      await db.transaction(async (tx) => {
+        await tx.delete(organizationMembers).where(eq(organizationMembers.userId, userId));
+
+        const [newOrganization] = await tx
+          .insert(organizations)
+          .values({ name: `${target.name}'s workspace` })
+          .returning();
+
+        await tx.insert(organizationMembers).values({
+          organizationId: newOrganization!.id,
+          userId,
+          role: "admin",
+        });
+      });
+
+      return res.json({ message: "Member removed." });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
