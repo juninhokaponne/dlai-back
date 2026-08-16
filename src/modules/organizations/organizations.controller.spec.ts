@@ -1,0 +1,67 @@
+import { jest, describe, it, expect, beforeEach } from "@jest/globals";
+import { createDbMock } from "../../tests/helpes/db-mock.js";
+import { mockRequest, mockResponse } from "../../tests/helpes/express-mock.js";
+
+jest.unstable_mockModule("../../database/index.js", () => ({
+  db: createDbMock(),
+}));
+
+jest.unstable_mockModule("../../shared/utils/security.js", () => ({
+  generateVerificationTokenRaw: jest.fn().mockReturnValue("mock-invite-token"),
+  inviteTokenExpiry: jest.fn().mockReturnValue(new Date("2026-08-23T00:00:00.000Z")),
+  hashPassword: jest.fn().mockResolvedValue("hashed-pw"),
+}));
+
+jest.unstable_mockModule("../../shared/email/send-organization-invite-email.js", () => ({
+  sendOrganizationInviteEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
+const { OrganizationsController } = await import("./organizations.controller.js");
+const { db } = await import("../../database/index.js");
+
+describe("OrganizationsController.inviteMember", () => {
+  let controller: InstanceType<typeof OrganizationsController>;
+  let req: any;
+  let res: any;
+  let next: jest.Mock;
+
+  beforeEach(() => {
+    controller = new OrganizationsController();
+    res = mockResponse();
+    next = jest.fn();
+  });
+
+  it("Should return 409 if the email already belongs to an existing account", async () => {
+    req = mockRequest({
+      body: { email: "existing@teste.com", role: "member" },
+      user: { userId: "admin-1", email: "admin@teste.com", organizationId: "org-1", role: "admin" },
+    } as any);
+
+    (db.select as jest.Mock).mockReturnThis();
+    (db.from as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.limit as jest.Mock).mockResolvedValue([{ id: "existing-user" }]);
+
+    await controller.inviteMember(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({ error: "This email already belongs to an existing account." });
+  });
+
+  it("Should forward unexpected errors to next()", async () => {
+    req = mockRequest({
+      body: { email: "new@teste.com", role: "member" },
+      user: { userId: "admin-1", email: "admin@teste.com", organizationId: "org-1", role: "admin" },
+    } as any);
+
+    (db.select as jest.Mock).mockReturnThis();
+    (db.from as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.limit as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    await controller.inviteMember(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
