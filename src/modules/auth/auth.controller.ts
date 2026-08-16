@@ -323,7 +323,7 @@ export class AuthController {
         .where(eq(organizations.id, req.user!.organizationId))
         .limit(1);
 
-      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0 } });
+      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0, role: req.user!.role } });
     } catch (err) {
       next(err);
     }
@@ -372,7 +372,7 @@ export class AuthController {
         .where(eq(organizations.id, req.user!.organizationId))
         .limit(1);
 
-      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0 } });
+      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0, role: req.user!.role } });
     } catch (err) {
       next(err);
     }

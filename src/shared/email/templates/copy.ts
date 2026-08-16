@@ -113,3 +113,39 @@ export const PASSWORD_CHANGED_EMAIL_COPY: Record<EmailLocale, PasswordChangedEma
     subject: "Sua senha da LetterGo AI foi alterada",
   },
 };
+
+type OrganizationInviteEmailCopy = {
+  body: string;
+  cta: string;
+  footer: string;
+  heading: string;
+  preview: string;
+  subject: string;
+};
+
+export const ORGANIZATION_INVITE_EMAIL_COPY: Record<EmailLocale, OrganizationInviteEmailCopy> = {
+  en: {
+    body: "You've been invited to join the {organizationName} workspace on LetterGo AI. Click the button below to create your account and get started. This invite expires in 7 days.",
+    cta: "Accept invite",
+    footer: "If you weren't expecting this invite, you can safely ignore this email.",
+    heading: "You're invited to join {organizationName}",
+    preview: "Join {organizationName} on LetterGo AI.",
+    subject: "You're invited to join {organizationName} on LetterGo AI",
+  },
+  es: {
+    body: "Te invitaron a unirte al espacio de trabajo {organizationName} en LetterGo AI. Haz clic en el botón de abajo para crear tu cuenta y empezar. Esta invitación vence en 7 días.",
+    cta: "Aceptar invitación",
+    footer: "Si no esperabas esta invitación, puedes ignorar este correo con tranquilidad.",
+    heading: "Te invitaron a unirte a {organizationName}",
+    preview: "Únete a {organizationName} en LetterGo AI.",
+    subject: "Te invitaron a unirte a {organizationName} en LetterGo AI",
+  },
+  pt: {
+    body: "Você foi convidado a entrar no workspace {organizationName} na LetterGo AI. Clique no botão abaixo pra criar sua conta e começar. Esse convite expira em 7 dias.",
+    cta: "Aceitar convite",
+    footer: "Se você não esperava esse convite, pode ignorar este email com tranquilidade.",
+    heading: "Você foi convidado pra entrar em {organizationName}",
+    preview: "Entre em {organizationName} na LetterGo AI.",
+    subject: "Você foi convidado pra entrar em {organizationName} na LetterGo AI",
+  },
+};
