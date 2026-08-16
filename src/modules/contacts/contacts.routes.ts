@@ -21,5 +21,7 @@ router.get("/", controller.list);
 router.post("/", validate(contactRowSchema), controller.create);
 router.post("/import", upload.single("file"), controller.import);
 router.post("/import-text", validate(importTextSchema), controller.importText);
+router.post("/:id/tags", controller.addTag);
+router.delete("/:id/tags/:tagId", controller.removeTag);
 
 export { router as contactsRoutes };

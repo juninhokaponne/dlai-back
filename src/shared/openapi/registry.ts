@@ -419,6 +419,35 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "post",
+  path: "/api/contacts/{id}/tags",
+  tags: ["Contacts"],
+  summary: "Aplica uma tag a um contact",
+  security: bearerAuth,
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: { content: { "application/json": { schema: z.object({ tagId: z.string().uuid() }) } } },
+  },
+  responses: {
+    201: { description: "Tag aplicada" },
+    404: errorResponse("Contact ou tag nao encontrado"),
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/contacts/{id}/tags/{tagId}",
+  tags: ["Contacts"],
+  summary: "Remove uma tag de um contact",
+  security: bearerAuth,
+  request: { params: z.object({ id: z.string().uuid(), tagId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Tag removida" },
+    404: errorResponse("Contact nao encontrado"),
+  },
+});
+
+registry.registerPath({
   method: "get",
   path: "/api/t/o/{sendEventId}",
   tags: ["Tracking"],

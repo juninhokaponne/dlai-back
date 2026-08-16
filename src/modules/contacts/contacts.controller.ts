@@ -3,7 +3,7 @@ import { parse } from "csv-parse/sync";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { contacts } from "../../database/schema/schema.js";
+import { contacts, contactTags, tags } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { contactRowSchema } from "./contact.schema.js";
 import { fireNewSubscriberAutomations } from "../../shared/automations/contact-triggers.js";
@@ -12,6 +12,7 @@ const MAX_ROWS = 20_000;
 const MAX_INVALID_SAMPLES = 20;
 const MAX_MANUAL_CONTACTS = 50;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const idParamSchema = z.string().uuid();
 
 function detectDelimiter(buffer: Buffer): string {
   const firstLine = buffer.toString("utf-8", 0, Math.min(buffer.length, 2000)).split(/\r?\n/)[0] ?? "";
@@ -284,6 +285,70 @@ export class ContactsController {
         .send(
           "<p>Voce foi descadastrado com sucesso e nao vai mais receber emails desta lista.</p>",
         );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async addTag(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedContactId = idParamSchema.safeParse(req.params.id);
+      const parsedTagId = idParamSchema.safeParse(req.body.tagId);
+      if (!parsedContactId.success || !parsedTagId.success) {
+        return res.status(400).json({ error: "Invalid contact or tag id." });
+      }
+
+      const [contact] = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.id, parsedContactId.data), eq(contacts.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found." });
+      }
+
+      const [tag] = await db
+        .select({ id: tags.id })
+        .from(tags)
+        .where(and(eq(tags.id, parsedTagId.data), eq(tags.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found." });
+      }
+
+      await db
+        .insert(contactTags)
+        .values({ contactId: contact.id, tagId: tag.id })
+        .onConflictDoNothing();
+
+      return res.status(201).json({ message: "Tag applied." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async removeTag(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedContactId = idParamSchema.safeParse(req.params.id);
+      const parsedTagId = idParamSchema.safeParse(req.params.tagId);
+      if (!parsedContactId.success || !parsedTagId.success) {
+        return res.status(400).json({ error: "Invalid contact or tag id." });
+      }
+
+      const [contact] = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.id, parsedContactId.data), eq(contacts.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found." });
+      }
+
+      await db
+        .delete(contactTags)
+        .where(and(eq(contactTags.contactId, parsedContactId.data), eq(contactTags.tagId, parsedTagId.data)));
+
+      return res.json({ message: "Tag removed." });
     } catch (err) {
       next(err);
     }
