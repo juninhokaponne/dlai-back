@@ -2,10 +2,17 @@ import { Router } from "express";
 import { OrganizationsController } from "./organizations.controller.js";
 import { validate } from "../../shared/middlewares/validate.js";
 import { requireAuth, requireRole } from "../../shared/middlewares/auth.js";
-import { acceptInviteSchema, inviteMemberSchema, updateMemberRoleSchema } from "./organizations.schema.js";
+import {
+  acceptInviteSchema,
+  inviteMemberSchema,
+  updateMemberRoleSchema,
+  updateOrganizationSchema,
+} from "./organizations.schema.js";
 
 const router = Router();
 const controller = new OrganizationsController();
+
+router.patch("/", requireAuth, requireRole("admin"), validate(updateOrganizationSchema), controller.updateOrganization);
 
 router.get("/members", requireAuth, controller.listMembers);
 router.patch(

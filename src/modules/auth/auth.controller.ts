@@ -318,12 +318,25 @@ export class AuthController {
       }
 
       const [organization] = await db
-        .select({ creditBalance: organizations.creditBalance })
+        .select({ creditBalance: organizations.creditBalance, name: organizations.name })
         .from(organizations)
         .where(eq(organizations.id, req.user!.organizationId))
         .limit(1);
 
-      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0, role: req.user!.role } });
+      const organizationMemberCount = await db.$count(
+        organizationMembers,
+        eq(organizationMembers.organizationId, req.user!.organizationId),
+      );
+
+      return res.json({
+        user: {
+          ...user,
+          creditBalance: organization?.creditBalance ?? 0,
+          role: req.user!.role,
+          organizationName: organization?.name ?? "",
+          organizationMemberCount,
+        },
+      });
     } catch (err) {
       next(err);
     }
@@ -367,12 +380,25 @@ export class AuthController {
         .returning(USER_PROFILE_COLUMNS);
 
       const [organization] = await db
-        .select({ creditBalance: organizations.creditBalance })
+        .select({ creditBalance: organizations.creditBalance, name: organizations.name })
         .from(organizations)
         .where(eq(organizations.id, req.user!.organizationId))
         .limit(1);
 
-      return res.json({ user: { ...user, creditBalance: organization?.creditBalance ?? 0, role: req.user!.role } });
+      const organizationMemberCount = await db.$count(
+        organizationMembers,
+        eq(organizationMembers.organizationId, req.user!.organizationId),
+      );
+
+      return res.json({
+        user: {
+          ...user,
+          creditBalance: organization?.creditBalance ?? 0,
+          role: req.user!.role,
+          organizationName: organization?.name ?? "",
+          organizationMemberCount,
+        },
+      });
     } catch (err) {
       next(err);
     }
