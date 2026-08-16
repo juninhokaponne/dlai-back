@@ -20,3 +20,7 @@ export const acceptInviteSchema = z.object({
   lastname: z.string().trim().nonempty(),
   password: strongPasswordSchema,
 });
+
+export const updateOrganizationSchema = z.object({
+  name: z.string().trim().min(1, "Organization name is required.").max(255),
+});

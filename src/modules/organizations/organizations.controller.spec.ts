@@ -163,6 +163,51 @@ describe("OrganizationsController.updateMemberRole", () => {
   });
 });
 
+describe("OrganizationsController.updateOrganization", () => {
+  let controller: InstanceType<typeof OrganizationsController>;
+  let req: any;
+  let res: any;
+  let next: jest.Mock;
+
+  beforeEach(() => {
+    controller = new OrganizationsController();
+    res = mockResponse();
+    next = jest.fn();
+  });
+
+  it("Should update the organization name and return it", async () => {
+    req = mockRequest({
+      body: { name: "  Acme Inc  " },
+      user: { userId: "admin-1", email: "admin@teste.com", organizationId: "org-1", role: "admin" },
+    } as any);
+
+    (db.update as jest.Mock).mockReturnThis();
+    (db.set as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.returning as jest.Mock).mockResolvedValue([{ id: "org-1", name: "  Acme Inc  " }]);
+
+    await controller.updateOrganization(req, res, next);
+
+    expect(res.json).toHaveBeenCalledWith({ organization: { id: "org-1", name: "  Acme Inc  " } });
+  });
+
+  it("Should forward unexpected errors to next()", async () => {
+    req = mockRequest({
+      body: { name: "Acme Inc" },
+      user: { userId: "admin-1", email: "admin@teste.com", organizationId: "org-1", role: "admin" },
+    } as any);
+
+    (db.update as jest.Mock).mockReturnThis();
+    (db.set as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.returning as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    await controller.updateOrganization(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+});
+
 describe("OrganizationsController.removeMember", () => {
   let controller: InstanceType<typeof OrganizationsController>;
   let req: any;

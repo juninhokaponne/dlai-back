@@ -15,11 +15,14 @@ export class AutomationsController {
       const rows = await db
         .select({
           id: automations.id,
+          userId: automations.userId,
           name: automations.name,
           status: automations.status,
           updatedAt: automations.updatedAt,
+          createdByName: users.name,
         })
         .from(automations)
+        .innerJoin(users, eq(automations.userId, users.id))
         .where(eq(automations.organizationId, req.user!.organizationId))
         .orderBy(desc(automations.updatedAt));
 

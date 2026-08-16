@@ -393,4 +393,20 @@ export class OrganizationsController {
       next(err);
     }
   }
+
+  async updateOrganization(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { name } = req.body;
+
+      const [organization] = await db
+        .update(organizations)
+        .set({ name, updatedAt: new Date() })
+        .where(eq(organizations.id, req.user!.organizationId))
+        .returning({ id: organizations.id, name: organizations.name });
+
+      return res.json({ organization });
+    } catch (err) {
+      next(err);
+    }
+  }
 }

@@ -22,6 +22,7 @@ import {
   acceptInviteSchema,
   inviteMemberSchema,
   updateMemberRoleSchema,
+  updateOrganizationSchema,
 } from "../../modules/organizations/organizations.schema.js";
 
 extendZodWithOpenApi(z);
@@ -502,11 +503,12 @@ registry.registerPath({
   method: "get",
   path: "/api/billing/invoices",
   tags: ["Billing"],
-  summary: "Historico de faturas do usuario (buscado direto do Stripe)",
+  summary: "Historico de faturas da organizacao, buscado direto do Stripe (somente admin)",
   security: bearerAuth,
   responses: {
     200: { description: "Faturas", content: { "application/json": { schema: z.object({ invoices: z.array(z.object({})) }) } } },
     401: errorResponse("Nao autenticado"),
+    403: errorResponse("Somente admins podem ver o historico de pagamentos"),
   },
 });
 
@@ -851,6 +853,18 @@ registry.registerPath({
       description: "Membros e convites",
       content: { "application/json": { schema: z.object({ members: z.array(z.object({})), invites: z.array(z.object({})) }) } },
     },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/organizations",
+  tags: ["Organizations"],
+  summary: "Renomeia a organizacao (somente admin)",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: updateOrganizationSchema } } } },
+  responses: {
+    200: { description: "Organizacao atualizada", content: { "application/json": { schema: z.object({ organization: z.object({}) }) } } },
   },
 });
 

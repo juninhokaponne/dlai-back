@@ -4,7 +4,7 @@ import { automations, automationRuns, automationRunContacts, newsletters, templa
 import type { GraphEdge, GraphNode } from "./graph-walk.js";
 import { createNewsletter, startNewsletterGeneration } from "../../modules/newsletter/newsletter.service.js";
 import { InsufficientCreditsError } from "../billing/billing.errors.js";
-import { createNotification } from "../notifications/notifications.service.js";
+import { createNotification, notifyOrganizationAdmins } from "../notifications/notifications.service.js";
 import { createLogger } from "../logger/logger.js";
 
 const logger = createLogger("automation-run-orchestration");
@@ -44,7 +44,10 @@ export async function resolveRunContent(
           .update(automations)
           .set({ status: "draft", nextRunAt: null, updatedAt: new Date() })
           .where(eq(automations.id, automation.id));
-        await createNotification({ userId: automation.userId, type: "automation_paused_insufficient_credits" });
+        await notifyOrganizationAdmins({
+          organizationId: automation.organizationId!,
+          type: "automation_paused_insufficient_credits",
+        });
         return null;
       }
       logger.error({ err, automationId: automation.id }, "Failed to start automation content generation");
