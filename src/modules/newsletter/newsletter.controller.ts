@@ -33,8 +33,25 @@ export class NewsletterController {
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const rows = await db
-        .select()
+        .select({
+          id: newsletters.id,
+          userId: newsletters.userId,
+          organizationId: newsletters.organizationId,
+          topic: newsletters.topic,
+          title: newsletters.title,
+          content: newsletters.content,
+          status: newsletters.status,
+          generationCostUsd: newsletters.generationCostUsd,
+          lastErrorMessage: newsletters.lastErrorMessage,
+          recipientCount: newsletters.recipientCount,
+          isArchived: newsletters.isArchived,
+          createdAt: newsletters.createdAt,
+          updatedAt: newsletters.updatedAt,
+          sentAt: newsletters.sentAt,
+          createdByName: users.name,
+        })
         .from(newsletters)
+        .innerJoin(users, eq(newsletters.userId, users.id))
         .where(eq(newsletters.organizationId, req.user!.organizationId))
         .orderBy(desc(newsletters.createdAt));
 
