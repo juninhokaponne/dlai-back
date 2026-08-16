@@ -353,4 +353,40 @@ export class ContactsController {
       next(err);
     }
   }
+
+  async bulkTag(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { contactIds, tagId } = req.body as { contactIds: string[]; tagId: string };
+
+      const [tag] = await db
+        .select({ id: tags.id })
+        .from(tags)
+        .where(and(eq(tags.id, tagId), eq(tags.organizationId, req.user!.organizationId)))
+        .limit(1);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag not found." });
+      }
+
+      const ownedContacts = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(
+          and(
+            eq(contacts.organizationId, req.user!.organizationId),
+            or(...contactIds.map((id) => eq(contacts.id, id))),
+          ),
+        );
+
+      if (ownedContacts.length > 0) {
+        await db
+          .insert(contactTags)
+          .values(ownedContacts.map((contact) => ({ contactId: contact.id, tagId: tag.id })))
+          .onConflictDoNothing();
+      }
+
+      return res.json({ tagged: ownedContacts.length });
+    } catch (err) {
+      next(err);
+    }
+  }
 }

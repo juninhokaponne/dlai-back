@@ -16,7 +16,7 @@ import {
 } from "../../modules/newsletter/newsletter.schema.js";
 import { checkoutSchema } from "../../modules/billing/billing.schema.js";
 import { workspaceGenerateSchema, workspaceTextActionSchema } from "../../modules/workspace/workspace.schema.js";
-import { contactRowSchema, importTextSchema } from "../../modules/contacts/contact.schema.js";
+import { contactRowSchema, importTextSchema, bulkTagSchema } from "../../modules/contacts/contact.schema.js";
 import { createTemplateSchema, generateTemplateSchema } from "../../modules/templates/template.schema.js";
 import {
   acceptInviteSchema,
@@ -444,6 +444,19 @@ registry.registerPath({
   responses: {
     200: { description: "Tag removida" },
     404: errorResponse("Contact nao encontrado"),
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/contacts/bulk-tag",
+  tags: ["Contacts"],
+  summary: "Aplica uma tag a varios contacts de uma vez",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: bulkTagSchema } } } },
+  responses: {
+    200: { description: "Contatos marcados", content: { "application/json": { schema: z.object({ tagged: z.number() }) } } },
+    404: errorResponse("Tag nao encontrada"),
   },
 });
 
