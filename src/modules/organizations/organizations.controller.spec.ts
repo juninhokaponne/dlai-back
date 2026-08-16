@@ -65,3 +65,68 @@ describe("OrganizationsController.inviteMember", () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 });
+
+describe("OrganizationsController.acceptInvite", () => {
+  let controller: InstanceType<typeof OrganizationsController>;
+  let req: any;
+  let res: any;
+  let next: jest.Mock;
+
+  beforeEach(() => {
+    controller = new OrganizationsController();
+    res = mockResponse();
+    next = jest.fn();
+  });
+
+  it("Should return 400 if the invite has already been accepted", async () => {
+    req = mockRequest({
+      params: { token: "some-token" },
+      body: { name: "Ana", lastname: "Silva", password: "Abcdefgh1234" },
+    } as any);
+
+    (db.select as jest.Mock).mockReturnThis();
+    (db.from as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.limit as jest.Mock).mockResolvedValue([
+      {
+        id: "invite-1",
+        organizationId: "org-1",
+        email: "new@teste.com",
+        role: "member",
+        status: "accepted",
+        expiresAt: new Date("2099-01-01"),
+      },
+    ]);
+
+    await controller.acceptInvite(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "This invite is no longer valid." });
+  });
+
+  it("Should return 400 if the invite has expired", async () => {
+    req = mockRequest({
+      params: { token: "some-token" },
+      body: { name: "Ana", lastname: "Silva", password: "Abcdefgh1234" },
+    } as any);
+
+    (db.select as jest.Mock).mockReturnThis();
+    (db.from as jest.Mock).mockReturnThis();
+    (db.where as jest.Mock).mockReturnThis();
+    (db.limit as jest.Mock).mockResolvedValue([
+      {
+        id: "invite-1",
+        organizationId: "org-1",
+        email: "new@teste.com",
+        role: "member",
+        status: "pending",
+        expiresAt: new Date("2000-01-01"),
+      },
+    ]);
+
+    await controller.acceptInvite(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "This invite link has expired." });
+  });
+});

@@ -1,14 +1,18 @@
-import type { NextFunction, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../../database/index.js";
 import { organizations, organizationMembers, organizationInvites, users } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
-import { generateVerificationTokenRaw, inviteTokenExpiry } from "../../shared/utils/security.js";
+import { generateVerificationTokenRaw, hashPassword, inviteTokenExpiry } from "../../shared/utils/security.js";
 import { sendOrganizationInviteEmail } from "../../shared/email/send-organization-invite-email.js";
 import type { EmailLocale } from "../../shared/email/templates/copy.js";
 import { createLogger } from "../../shared/logger/logger.js";
 
 const logger = createLogger("organizations.controller");
+
+const idParamSchema = z.string().uuid();
+const tokenParamSchema = z.string().min(1);
 
 export class OrganizationsController {
   async listMembers(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -140,6 +144,148 @@ export class OrganizationsController {
           expiresAt: invite!.expiresAt,
         },
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async revokeInvite(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedInviteId = idParamSchema.safeParse(req.params.inviteId);
+      if (!parsedInviteId.success) {
+        return res.status(400).json({ error: "Invalid invite id." });
+      }
+
+      const [invite] = await db
+        .update(organizationInvites)
+        .set({ status: "revoked" })
+        .where(
+          and(
+            eq(organizationInvites.id, parsedInviteId.data),
+            eq(organizationInvites.organizationId, req.user!.organizationId),
+            eq(organizationInvites.status, "pending"),
+          ),
+        )
+        .returning({ id: organizationInvites.id });
+
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found." });
+      }
+
+      return res.json({ message: "Invite revoked." });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getInviteByToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const parsedToken = tokenParamSchema.safeParse(req.params.token);
+      if (!parsedToken.success) {
+        return res.status(404).json({ error: "This invite link is invalid." });
+      }
+
+      const [invite] = await db
+        .select({
+          email: organizationInvites.email,
+          role: organizationInvites.role,
+          status: organizationInvites.status,
+          expiresAt: organizationInvites.expiresAt,
+          organizationId: organizationInvites.organizationId,
+        })
+        .from(organizationInvites)
+        .where(eq(organizationInvites.token, parsedToken.data))
+        .limit(1);
+
+      if (!invite) {
+        return res.status(404).json({ error: "This invite link is invalid." });
+      }
+
+      const [organization] = await db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, invite.organizationId))
+        .limit(1);
+
+      const status = invite.status === "pending" && invite.expiresAt < new Date() ? "expired" : invite.status;
+
+      return res.json({
+        email: invite.email,
+        role: invite.role,
+        organizationName: organization?.name ?? "LetterGo AI",
+        status,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async acceptInvite(req: Request, res: Response, next: NextFunction) {
+    try {
+      const parsedToken = tokenParamSchema.safeParse(req.params.token);
+      if (!parsedToken.success) {
+        return res.status(404).json({ error: "This invite link is invalid." });
+      }
+      const { name, lastname, password } = req.body;
+
+      const [invite] = await db
+        .select()
+        .from(organizationInvites)
+        .where(eq(organizationInvites.token, parsedToken.data))
+        .limit(1);
+
+      if (!invite) {
+        return res.status(404).json({ error: "This invite link is invalid." });
+      }
+      if (invite.status !== "pending") {
+        return res.status(400).json({ error: "This invite is no longer valid." });
+      }
+      if (invite.expiresAt < new Date()) {
+        return res.status(400).json({ error: "This invite link has expired." });
+      }
+
+      const [existingUser] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, invite.email))
+        .limit(1);
+      if (existingUser) {
+        return res.status(409).json({ error: "An account with this email already exists." });
+      }
+
+      const passwordHash = await hashPassword(password);
+
+      const newUser = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(users)
+          .values({ name, lastName: lastname, email: invite.email, passwordHash, isEmailVerified: true })
+          .returning();
+
+        await tx.insert(organizationMembers).values({
+          organizationId: invite.organizationId,
+          userId: created!.id,
+          role: invite.role,
+        });
+
+        await tx
+          .update(organizationInvites)
+          .set({ status: "accepted" })
+          .where(eq(organizationInvites.id, invite.id));
+
+        return created!;
+      });
+
+      // No auth middleware runs on this route (the user doesn't exist yet
+      // when the request starts), so attach the identity we just created
+      // for the request-completion log line to pick up.
+      (req as AuthenticatedRequest).user = {
+        userId: newUser.id,
+        email: newUser.email,
+        organizationId: invite.organizationId,
+        role: invite.role,
+      };
+
+      return res.status(201).json({ message: "Account created. You can sign in now.", email: newUser.email });
     } catch (err) {
       next(err);
     }
