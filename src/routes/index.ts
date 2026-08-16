@@ -10,6 +10,7 @@ import { notificationsRoutes } from "../modules/notifications/notifications.rout
 import { automationsRoutes } from "../modules/automations/automations.routes.js";
 import { trackingRoutes } from "../modules/tracking/tracking.routes.js";
 import { organizationsRoutes } from "../modules/organizations/organizations.routes.js";
+import { tagsRoutes } from "../modules/tags/tags.routes.js";
 
 export const router = Router();
 
@@ -24,3 +25,4 @@ router.use("/notifications", notificationsRoutes);
 router.use("/automations", automationsRoutes);
 router.use("/t", trackingRoutes);
 router.use("/organizations", organizationsRoutes);
+router.use("/tags", tagsRoutes);
