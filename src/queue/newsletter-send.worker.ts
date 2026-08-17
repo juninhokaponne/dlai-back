@@ -107,7 +107,7 @@ async function processJob(job: Job<NewsletterSendJobData>) {
 
       let html = buildEmailHtml(personalizedContent, unsubscribeUrl);
       html = injectTracking(html, sendEventId, API_PUBLIC_URL);
-      await emailProvider.send({
+      const result = await emailProvider.send({
         to: contact.email,
         subject: personalizedSubject,
         html,
@@ -116,6 +116,7 @@ async function processJob(job: Job<NewsletterSendJobData>) {
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
       });
+      await db.update(emailSendEvents).set({ resendMessageId: result.id }).where(eq(emailSendEvents.id, sendEventId));
       sent++;
     } catch (err) {
       failed++;

@@ -197,6 +197,13 @@
       "when": 1786993247749,
       "tag": "0027_drop_automation_send_events",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786995192400,
+      "tag": "0028_add_resend_webhook_fields",
+      "breakpoints": true
     }
   ]
 }
