@@ -260,6 +260,22 @@ export const contactTagsRelations = relations(contactTags, ({ one }) => ({
   }),
 }));
 
+export const segments = pgTable("segments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  rules: jsonb("rules").default({ conditions: [] }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const segmentsRelations = relations(segments, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [segments.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
 export const creditTransactionReason = pgEnum("credit_transaction_reason", [
   "trial_grant",
   "subscription_grant",

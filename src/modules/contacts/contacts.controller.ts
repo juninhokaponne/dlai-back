@@ -3,10 +3,11 @@ import { parse } from "csv-parse/sync";
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { contacts, contactTags, tags } from "../../database/schema/schema.js";
+import { contacts, contactTags, segments, tags } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { contactRowSchema } from "./contact.schema.js";
 import { fireNewSubscriberAutomations } from "../../shared/automations/contact-triggers.js";
+import { resolveSegmentWhereClause, type SegmentCondition } from "../../shared/segments/segments.service.js";
 
 const MAX_ROWS = 20_000;
 const MAX_INVALID_SAMPLES = 20;
@@ -66,6 +67,7 @@ export class ContactsController {
       const offset = Math.max(Number(req.query.offset) || 0, 0);
       const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
       const tagIdFilter = idParamSchema.safeParse(req.query.tagId);
+      const segmentIdFilter = idParamSchema.safeParse(req.query.segmentId);
 
       const conditions = [eq(contacts.organizationId, req.user!.organizationId)];
       if (search) {
@@ -78,6 +80,18 @@ export class ContactsController {
             db.select({ id: contactTags.contactId }).from(contactTags).where(eq(contactTags.tagId, tagIdFilter.data)),
           ),
         );
+      }
+      if (segmentIdFilter.success) {
+        const [segment] = await db
+          .select({ rules: segments.rules })
+          .from(segments)
+          .where(and(eq(segments.id, segmentIdFilter.data), eq(segments.organizationId, req.user!.organizationId)))
+          .limit(1);
+        if (segment) {
+          const segmentConditions = (segment.rules as { conditions: SegmentCondition[] }).conditions;
+          const segmentClause = resolveSegmentWhereClause(req.user!.organizationId, segmentConditions);
+          if (segmentClause) conditions.push(segmentClause);
+        }
       }
       const whereClause = and(...conditions);
 
