@@ -176,6 +176,13 @@
       "when": 1786909830390,
       "tag": "0024_worthless_nehzno",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786928560633,
+      "tag": "0025_illegal_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }
