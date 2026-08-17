@@ -25,7 +25,8 @@ export type SendEventState = {
 export type WalkResult =
   | { action: "send"; nextNodeId: string | null }
   | { action: "advance"; nextNodeId: string | null }
-  | { action: "wait"; waitUntil: Date };
+  | { action: "wait"; waitUntil: Date }
+  | { action: "updateTag"; tagId: string; tagAction: "add" | "remove"; nextNodeId: string | null };
 
 const DELAY_UNIT_MS: Record<string, number> = {
   minutes: 60_000,
@@ -48,6 +49,15 @@ export function decideNextStep(input: {
 
   if (node.type === "action" && node.data.subtype === "send_email") {
     return { action: "send", nextNodeId: edgeTo(edges, node.id) };
+  }
+
+  if (node.type === "action" && node.data.subtype === "update_segment") {
+    const tagId = node.data.config?.tagId;
+    if (!tagId) {
+      return { action: "advance", nextNodeId: edgeTo(edges, node.id) };
+    }
+    const tagAction = node.data.config?.action === "remove" ? "remove" : "add";
+    return { action: "updateTag", tagId, tagAction, nextNodeId: edgeTo(edges, node.id) };
   }
 
   if (node.type === "action") {
