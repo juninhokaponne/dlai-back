@@ -5,6 +5,7 @@ import { requireAuth } from "../../shared/middlewares/auth.js";
 import {
   createNewsletterSchema,
   generateSchema,
+  sendNewsletterSchema,
   updateNewsletterSchema,
 } from "./newsletter.schema.js";
 
@@ -20,6 +21,6 @@ router.get("/:id", controller.get);
 router.put("/:id", validate(updateNewsletterSchema), controller.update);
 router.delete("/:id", controller.remove);
 router.post("/:id/generate", validate(generateSchema), controller.generate);
-router.post("/:id/send", controller.send);
+router.post("/:id/send", validate(sendNewsletterSchema), controller.send);
 
 export { router as newsletterRoutes };

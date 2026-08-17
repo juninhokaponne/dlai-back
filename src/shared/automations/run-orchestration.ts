@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../database/index.js";
-import { automations, automationRuns, automationRunContacts, newsletters, templates } from "../../database/schema/schema.js";
+import { automations, automationRuns, automationRunContacts, contacts, newsletters, templates } from "../../database/schema/schema.js";
 import type { GraphEdge, GraphNode } from "./graph-walk.js";
 import { createNewsletter, startNewsletterGeneration } from "../../modules/newsletter/newsletter.service.js";
 import { InsufficientCreditsError } from "../billing/billing.errors.js";
 import { createNotification, notifyOrganizationAdmins } from "../notifications/notifications.service.js";
+import { resolveAudienceConditions, resolveSegmentWhereClause } from "../segments/segments.service.js";
 import { createLogger } from "../logger/logger.js";
 
 const logger = createLogger("automation-run-orchestration");
@@ -112,6 +113,27 @@ export async function startRunForContacts(
   if (!startNode) return;
 
   const sendEmailNode = findSendEmailNode(nodes);
+
+  // Narrow the trigger's contact batch down to the send_email node's audience
+  // *before* spending an AI generation credit on content nobody will end up
+  // receiving.
+  let recipientIds = contactIds;
+  if (sendEmailNode) {
+    const audience = sendEmailNode.data.config?.audience;
+    const conditions = await resolveAudienceConditions(automation.organizationId!, audience);
+    if (conditions === null) {
+      recipientIds = [];
+    } else if (conditions.length > 0) {
+      const whereClause = resolveSegmentWhereClause(automation.organizationId!, conditions);
+      const matched = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.organizationId, automation.organizationId!), inArray(contacts.id, contactIds), whereClause));
+      recipientIds = matched.map((contact) => contact.id);
+    }
+  }
+  if (recipientIds.length === 0) return;
+
   const content = sendEmailNode ? await resolveRunContent(automation, sendEmailNode) : null;
   if (sendEmailNode && !content) return;
 
@@ -125,7 +147,7 @@ export async function startRunForContacts(
     .returning();
 
   await db.insert(automationRunContacts).values(
-    contactIds.map((contactId) => ({
+    recipientIds.map((contactId) => ({
       runId: run!.id,
       automationId: automation.id,
       contactId,

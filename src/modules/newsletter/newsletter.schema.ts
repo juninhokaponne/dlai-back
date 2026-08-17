@@ -20,3 +20,7 @@ export const updateNewsletterSchema = z.object({
   content: z.string().trim().min(1).optional(),
   isArchived: z.boolean().optional(),
 });
+
+export const sendNewsletterSchema = z.object({
+  segmentId: z.string().uuid().optional(),
+});

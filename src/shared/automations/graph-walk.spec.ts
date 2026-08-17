@@ -20,18 +20,51 @@ describe("decideNextStep", () => {
     expect(result).toEqual({ action: "send", nextNodeId: null });
   });
 
-  it("passes through webhook and update_segment as advance no-ops", () => {
+  it("passes through webhook as an advance no-op", () => {
     const webhookNode: GraphNode = { id: "n1", type: "action", data: { subtype: "webhook", config: {} } };
-    const segmentNode: GraphNode = { id: "n1", type: "action", data: { subtype: "update_segment", config: {} } };
     const edges = [edge("n1", "n2")];
     expect(decideNextStep({ node: webhookNode, edges, now: NOW, lastSendEvent: null })).toEqual({
       action: "advance",
       nextNodeId: "n2",
     });
-    expect(decideNextStep({ node: segmentNode, edges, now: NOW, lastSendEvent: null })).toEqual({
-      action: "advance",
-      nextNodeId: "n2",
-    });
+  });
+
+  it("adds a tag for an update_segment action node with action 'add'", () => {
+    const node: GraphNode = {
+      id: "n1",
+      type: "action",
+      data: { subtype: "update_segment", config: { tagId: "tag-1", action: "add" } },
+    };
+    const edges = [edge("n1", "n2")];
+    const result = decideNextStep({ node, edges, now: NOW, lastSendEvent: null });
+    expect(result).toEqual({ action: "updateTag", tagId: "tag-1", tagAction: "add", nextNodeId: "n2" });
+  });
+
+  it("removes a tag for an update_segment action node with action 'remove'", () => {
+    const node: GraphNode = {
+      id: "n1",
+      type: "action",
+      data: { subtype: "update_segment", config: { tagId: "tag-1", action: "remove" } },
+    };
+    const result = decideNextStep({ node, edges: [], now: NOW, lastSendEvent: null });
+    expect(result).toEqual({ action: "updateTag", tagId: "tag-1", tagAction: "remove", nextNodeId: null });
+  });
+
+  it("defaults update_segment action to 'add' when unset", () => {
+    const node: GraphNode = {
+      id: "n1",
+      type: "action",
+      data: { subtype: "update_segment", config: { tagId: "tag-1" } },
+    };
+    const result = decideNextStep({ node, edges: [], now: NOW, lastSendEvent: null });
+    expect(result).toEqual({ action: "updateTag", tagId: "tag-1", tagAction: "add", nextNodeId: null });
+  });
+
+  it("falls back to advance for a misconfigured update_segment node with no tagId", () => {
+    const node: GraphNode = { id: "n1", type: "action", data: { subtype: "update_segment", config: {} } };
+    const edges = [edge("n1", "n2")];
+    const result = decideNextStep({ node, edges, now: NOW, lastSendEvent: null });
+    expect(result).toEqual({ action: "advance", nextNodeId: "n2" });
   });
 
   it("waits for a delay node using amount/unit config", () => {

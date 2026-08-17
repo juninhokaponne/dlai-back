@@ -1,7 +1,7 @@
 import { and, eq, inArray, not } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { contacts, contactStatus, contactTags, tags } from "../../database/schema/schema.js";
+import { contacts, contactStatus, contactTags, segments, tags } from "../../database/schema/schema.js";
 
 export const segmentConditionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("tag"), tagId: z.string().uuid(), negate: z.boolean() }),
@@ -44,4 +44,26 @@ export function resolveSegmentWhereClause(organizationId: string, conditions: Se
   });
 
   return and(...clauses);
+}
+
+// The one place a send node's "audience" config (either "all"/unset, or a
+// segment id) becomes a condition list. Returns `null` when a specific
+// segment id was requested but no longer resolves (deleted) - callers must
+// treat that as "zero recipients", never fall back to "all contacts", since
+// silently widening a deliberately-narrowed audience is a safety issue, not
+// a convenience.
+export async function resolveAudienceConditions(
+  organizationId: string,
+  audience: string | null | undefined,
+): Promise<SegmentCondition[] | null> {
+  if (!audience || audience === "all") return [];
+
+  const [segment] = await db
+    .select({ rules: segments.rules })
+    .from(segments)
+    .where(and(eq(segments.id, audience), eq(segments.organizationId, organizationId)))
+    .limit(1);
+
+  if (!segment) return null;
+  return (segment.rules as { conditions: SegmentCondition[] }).conditions;
 }
