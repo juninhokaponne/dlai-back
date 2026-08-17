@@ -11,6 +11,7 @@ import { automationsRoutes } from "../modules/automations/automations.routes.js"
 import { trackingRoutes } from "../modules/tracking/tracking.routes.js";
 import { organizationsRoutes } from "../modules/organizations/organizations.routes.js";
 import { tagsRoutes } from "../modules/tags/tags.routes.js";
+import { segmentsRoutes } from "../modules/segments/segments.routes.js";
 
 export const router = Router();
 
@@ -26,3 +27,4 @@ router.use("/automations", automationsRoutes);
 router.use("/t", trackingRoutes);
 router.use("/organizations", organizationsRoutes);
 router.use("/tags", tagsRoutes);
+router.use("/segments", segmentsRoutes);

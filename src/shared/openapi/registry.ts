@@ -25,6 +25,7 @@ import {
   updateOrganizationSchema,
 } from "../../modules/organizations/organizations.schema.js";
 import { createTagSchema } from "../../modules/tags/tags.schema.js";
+import { upsertSegmentSchema } from "../../shared/segments/segments.service.js";
 
 extendZodWithOpenApi(z);
 
@@ -1042,5 +1043,63 @@ registry.registerPath({
   responses: {
     200: { description: "Tag removida" },
     404: errorResponse("Tag nao encontrada"),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Segments
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/api/segments",
+  tags: ["Segments"],
+  summary: "Lista os segmentos da organizacao",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Segmentos", content: { "application/json": { schema: z.object({ segments: z.array(z.object({})) }) } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/segments",
+  tags: ["Segments"],
+  summary: "Cria um segmento",
+  security: bearerAuth,
+  request: { body: { content: { "application/json": { schema: upsertSegmentSchema } } } },
+  responses: {
+    201: { description: "Segmento criado", content: { "application/json": { schema: z.object({ segment: z.object({}) }) } } },
+    400: errorResponse("Regra invalida ou referencia tag de outra organizacao"),
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/segments/{id}",
+  tags: ["Segments"],
+  summary: "Atualiza um segmento",
+  security: bearerAuth,
+  request: {
+    params: z.object({ id: z.string().uuid() }),
+    body: { content: { "application/json": { schema: upsertSegmentSchema } } },
+  },
+  responses: {
+    200: { description: "Segmento atualizado", content: { "application/json": { schema: z.object({ segment: z.object({}) }) } } },
+    400: errorResponse("Regra invalida ou referencia tag de outra organizacao"),
+    404: errorResponse("Segmento nao encontrado"),
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/segments/{id}",
+  tags: ["Segments"],
+  summary: "Remove um segmento",
+  security: bearerAuth,
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: { description: "Segmento removido" },
+    404: errorResponse("Segmento nao encontrado"),
   },
 });
