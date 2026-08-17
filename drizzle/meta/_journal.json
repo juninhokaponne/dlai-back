@@ -183,6 +183,20 @@
       "when": 1786928560633,
       "tag": "0025_illegal_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786993235204,
+      "tag": "0026_add_email_send_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786993247749,
+      "tag": "0027_drop_automation_send_events",
+      "breakpoints": true
     }
   ]
 }

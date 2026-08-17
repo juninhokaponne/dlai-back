@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { automationSendEvents } from "../../database/schema/schema.js";
+import { emailSendEvents } from "../../database/schema/schema.js";
 
 const idParamSchema = z.string().uuid();
 
@@ -20,9 +20,9 @@ export class TrackingController {
 
       if (parsedId.success) {
         await db
-          .update(automationSendEvents)
+          .update(emailSendEvents)
           .set({ openedAt: new Date() })
-          .where(and(eq(automationSendEvents.id, parsedId.data), isNull(automationSendEvents.openedAt)));
+          .where(and(eq(emailSendEvents.id, parsedId.data), isNull(emailSendEvents.openedAt)));
       }
 
       res.set("Content-Type", "image/png");
@@ -51,9 +51,9 @@ export class TrackingController {
 
       if (parsedId.success) {
         await db
-          .update(automationSendEvents)
+          .update(emailSendEvents)
           .set({ clickedAt: new Date() })
-          .where(and(eq(automationSendEvents.id, parsedId.data), isNull(automationSendEvents.clickedAt)));
+          .where(and(eq(emailSendEvents.id, parsedId.data), isNull(emailSendEvents.clickedAt)));
       }
 
       return res.redirect(302, targetUrl);

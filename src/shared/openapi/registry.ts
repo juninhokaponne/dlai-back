@@ -351,6 +351,32 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/newsletters/{id}/stats",
+  tags: ["Newsletters"],
+  summary: "Estatisticas de abertura/clique de uma newsletter (agregado de email_send_events)",
+  security: bearerAuth,
+  request: { params: uuidParam },
+  responses: {
+    200: {
+      description: "Estatisticas",
+      content: {
+        "application/json": {
+          schema: z.object({
+            sent: z.number(),
+            opened: z.number(),
+            clicked: z.number(),
+            openRate: z.number(),
+            clickRate: z.number(),
+          }),
+        },
+      },
+    },
+    404: errorResponse("Newsletter nao encontrada"),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Contacts
 // ---------------------------------------------------------------------------

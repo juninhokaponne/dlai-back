@@ -6,7 +6,7 @@ import {
   automations,
   automationRuns,
   automationRunContacts,
-  automationSendEvents,
+  emailSendEvents,
   contacts,
   newsletters,
 } from "../../database/schema/schema.js";
@@ -116,13 +116,13 @@ export class AutomationRunsController {
           status: automationRunContacts.status,
           waitUntil: automationRunContacts.waitUntil,
           updatedAt: automationRunContacts.updatedAt,
-          sentAt: automationSendEvents.sentAt,
-          openedAt: automationSendEvents.openedAt,
-          clickedAt: automationSendEvents.clickedAt,
+          sentAt: emailSendEvents.sentAt,
+          openedAt: emailSendEvents.openedAt,
+          clickedAt: emailSendEvents.clickedAt,
         })
         .from(automationRunContacts)
         .innerJoin(contacts, eq(automationRunContacts.contactId, contacts.id))
-        .leftJoin(automationSendEvents, eq(automationRunContacts.lastSendEventId, automationSendEvents.id))
+        .leftJoin(emailSendEvents, eq(automationRunContacts.lastSendEventId, emailSendEvents.id))
         .where(eq(automationRunContacts.runId, run.id))
         .orderBy(desc(automationRunContacts.updatedAt))
         .limit(200);
