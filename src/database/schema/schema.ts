@@ -476,15 +476,19 @@ export const automationRunContactsRelations = relations(automationRunContacts, (
   }),
 }));
 
-export const automationSendEvents = pgTable("automation_send_events", {
+// Tracks every email actually sent - manual/broadcast newsletter sends AND
+// automation-driven ones alike. `runContactId` is only set for the latter;
+// analytics queries must never assume it's present.
+export const emailSendEvents = pgTable("email_send_events", {
   id: uuid("id").defaultRandom().primaryKey(),
-  runContactId: uuid("run_contact_id")
-    .references(() => automationRunContacts.id, { onDelete: "cascade" })
+  organizationId: uuid("organization_id")
+    .references(() => organizations.id, { onDelete: "cascade" })
     .notNull(),
   contactId: uuid("contact_id")
     .references(() => contacts.id, { onDelete: "cascade" })
     .notNull(),
   newsletterId: uuid("newsletter_id").references(() => newsletters.id, { onDelete: "set null" }),
+  runContactId: uuid("run_contact_id").references(() => automationRunContacts.id, { onDelete: "cascade" }),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
   openedAt: timestamp("opened_at"),
   clickedAt: timestamp("clicked_at"),
@@ -553,13 +557,17 @@ export const organizationInvitesRelations = relations(organizationInvites, ({ on
   }),
 }));
 
-export const automationSendEventsRelations = relations(automationSendEvents, ({ one }) => ({
+export const emailSendEventsRelations = relations(emailSendEvents, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [emailSendEvents.organizationId],
+    references: [organizations.id],
+  }),
   runContact: one(automationRunContacts, {
-    fields: [automationSendEvents.runContactId],
+    fields: [emailSendEvents.runContactId],
     references: [automationRunContacts.id],
   }),
   contact: one(contacts, {
-    fields: [automationSendEvents.contactId],
+    fields: [emailSendEvents.contactId],
     references: [contacts.id],
   }),
 }));

@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { and, eq } from "drizzle-orm";
 import { db } from "../database/index.js";
-import { newsletters, contacts, users } from "../database/schema/schema.js";
+import { newsletters, contacts, emailSendEvents, users } from "../database/schema/schema.js";
 import { ResendEmailProvider } from "../shared/email/resend.provider.js";
 import { personalizeContent } from "../shared/newsletter/personalize.js";
 import { injectTracking } from "../shared/email/tracking-injector.js";
@@ -92,10 +92,21 @@ async function processJob(job: Job<NewsletterSendJobData>) {
       };
       const personalizedContent = personalizeContent(newsletter.content, personalizationData);
       const personalizedSubject = personalizeContent(newsletter.title, personalizationData);
-      let html = buildEmailHtml(personalizedContent, unsubscribeUrl);
-      if (trackingSendEventId) {
-        html = injectTracking(html, trackingSendEventId, API_PUBLIC_URL);
+      let sendEventId = trackingSendEventId;
+      if (!sendEventId) {
+        const [event] = await db
+          .insert(emailSendEvents)
+          .values({
+            organizationId: newsletter.organizationId!,
+            contactId: contact.id,
+            newsletterId: newsletter.id,
+          })
+          .returning({ id: emailSendEvents.id });
+        sendEventId = event!.id;
       }
+
+      let html = buildEmailHtml(personalizedContent, unsubscribeUrl);
+      html = injectTracking(html, sendEventId, API_PUBLIC_URL);
       await emailProvider.send({
         to: contact.email,
         subject: personalizedSubject,

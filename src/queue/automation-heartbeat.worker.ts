@@ -5,9 +5,9 @@ import {
   automations,
   automationRuns,
   automationRunContacts,
-  automationSendEvents,
   contacts,
   contactTags,
+  emailSendEvents,
   newsletters,
   tags,
   users,
@@ -73,9 +73,9 @@ async function loadLastSendEvent(sendEventId: string | null): Promise<SendEventS
   if (!sendEventId) return null;
 
   const [event] = await db
-    .select({ sentAt: automationSendEvents.sentAt, openedAt: automationSendEvents.openedAt, clickedAt: automationSendEvents.clickedAt })
-    .from(automationSendEvents)
-    .where(eq(automationSendEvents.id, sendEventId))
+    .select({ sentAt: emailSendEvents.sentAt, openedAt: emailSendEvents.openedAt, clickedAt: emailSendEvents.clickedAt })
+    .from(emailSendEvents)
+    .where(eq(emailSendEvents.id, sendEventId))
     .limit(1);
 
   return event ?? null;
@@ -137,8 +137,13 @@ async function advanceOne(runContact: typeof automationRunContacts.$inferSelect)
     }
 
     const [sendEvent] = await db
-      .insert(automationSendEvents)
-      .values({ runContactId: runContact.id, contactId: runContact.contactId, newsletterId: run.newsletterId })
+      .insert(emailSendEvents)
+      .values({
+        organizationId: automation.organizationId!,
+        runContactId: runContact.id,
+        contactId: runContact.contactId,
+        newsletterId: run.newsletterId,
+      })
       .returning();
 
     await getNewsletterSendQueue().add("send", {
