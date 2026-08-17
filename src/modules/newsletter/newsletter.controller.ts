@@ -1,8 +1,8 @@
 import type { NextFunction, Response } from "express";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { newsletters, segments, users } from "../../database/schema/schema.js";
+import { emailSendEvents, newsletters, segments, users } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { getNewsletterSendQueue } from "../../queue/newsletter-send.queue.js";
 import { contacts } from "../../database/schema/schema.js";
@@ -243,6 +243,40 @@ export class NewsletterController {
       return res
         .status(202)
         .json({ newsletter: updated, recipientCount: count });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async stats(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const parsedId = idParamSchema.safeParse(req.params.id);
+      if (!parsedId.success) {
+        return res.status(400).json({ error: "Invalid newsletter id." });
+      }
+
+      const newsletter = await findOwnedNewsletter(parsedId.data, req.user!.organizationId);
+      if (!newsletter) {
+        return res.status(404).json({ error: "Newsletter not found." });
+      }
+
+      const sent = await db.$count(emailSendEvents, eq(emailSendEvents.newsletterId, newsletter.id));
+      const opened = await db.$count(
+        emailSendEvents,
+        and(eq(emailSendEvents.newsletterId, newsletter.id), isNotNull(emailSendEvents.openedAt)),
+      );
+      const clicked = await db.$count(
+        emailSendEvents,
+        and(eq(emailSendEvents.newsletterId, newsletter.id), isNotNull(emailSendEvents.clickedAt)),
+      );
+
+      return res.json({
+        sent,
+        opened,
+        clicked,
+        openRate: sent > 0 ? opened / sent : 0,
+        clickRate: sent > 0 ? clicked / sent : 0,
+      });
     } catch (err) {
       next(err);
     }
