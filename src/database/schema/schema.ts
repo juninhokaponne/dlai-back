@@ -492,6 +492,15 @@ export const emailSendEvents = pgTable("email_send_events", {
   sentAt: timestamp("sent_at").defaultNow().notNull(),
   openedAt: timestamp("opened_at"),
   clickedAt: timestamp("clicked_at"),
+  // Resend's own message id - the correlation key for its webhook events
+  // (data.email_id). Set right after the send call returns; null until then.
+  resendMessageId: varchar("resend_message_id", { length: 255 }),
+  deliveredAt: timestamp("delivered_at"),
+  bouncedAt: timestamp("bounced_at"),
+  // Resend's bounce.type: "Permanent" (hard) vs "Transient"/"Undetermined" (soft).
+  // Only a hard bounce suppresses the contact - see resend-webhook.controller.ts.
+  bounceType: varchar("bounce_type", { length: 50 }),
+  complainedAt: timestamp("complained_at"),
 });
 
 export const organizations = pgTable("organizations", {

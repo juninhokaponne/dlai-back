@@ -9,6 +9,7 @@ import { errorHandler } from "./shared/middlewares/error-handler.js";
 import { notFound } from "./shared/middlewares/not-found.js";
 import { apiRateLimit } from "./shared/middlewares/rate-limit.js";
 import { handleStripeWebhook } from "./modules/billing/billing.webhook.js";
+import { handleResendWebhook } from "./modules/tracking/resend-webhook.controller.js";
 import { rootLogger } from "./shared/logger/logger.js";
 import { buildOpenApiDocument } from "./shared/openapi/document.js";
 import type { AuthenticatedRequest } from "./shared/middlewares/auth.js";
@@ -54,6 +55,13 @@ app.post(
   "/api/billing/webhook",
   express.raw({ type: "application/json" }),
   handleStripeWebhook,
+);
+
+// Resend needs the raw request body too, for the same svix-signature reason.
+app.post(
+  "/api/webhooks/resend",
+  express.raw({ type: "application/json" }),
+  handleResendWebhook,
 );
 
 app.use(express.json({ limit: "1mb" }));
