@@ -7,7 +7,9 @@ import {
   automationRunContacts,
   automationSendEvents,
   contacts,
+  contactTags,
   newsletters,
+  tags,
   users,
 } from "../database/schema/schema.js";
 import { getRedisConnection } from "./redis-connection.js";
@@ -152,6 +154,37 @@ async function advanceOne(runContact: typeof automationRunContacts.$inferSelect)
         currentNodeId: result.nextNodeId ?? runContact.currentNodeId,
         status: result.nextNodeId ? "pending" : "completed",
         lastSendEventId: sendEvent!.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(automationRunContacts.id, runContact.id));
+    return;
+  }
+
+  if (result.action === "updateTag") {
+    // Re-check the tag still belongs to this automation's org - the node's
+    // config is unvalidated JSON, same defense-in-depth reasoning as
+    // resolveSegmentWhereClause.
+    const [tag] = await db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(and(eq(tags.id, result.tagId), eq(tags.organizationId, automation.organizationId!)))
+      .limit(1);
+
+    if (tag) {
+      if (result.tagAction === "add") {
+        await db.insert(contactTags).values({ contactId: runContact.contactId, tagId: result.tagId }).onConflictDoNothing();
+      } else {
+        await db
+          .delete(contactTags)
+          .where(and(eq(contactTags.contactId, runContact.contactId), eq(contactTags.tagId, result.tagId)));
+      }
+    }
+
+    await db
+      .update(automationRunContacts)
+      .set({
+        currentNodeId: result.nextNodeId ?? runContact.currentNodeId,
+        status: result.nextNodeId ? "pending" : "completed",
         updatedAt: new Date(),
       })
       .where(eq(automationRunContacts.id, runContact.id));

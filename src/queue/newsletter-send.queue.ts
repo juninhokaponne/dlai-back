@@ -8,6 +8,7 @@ export interface NewsletterSendJobData {
   userId: string;
   contactId?: string;
   trackingSendEventId?: string;
+  segmentId?: string;
 }
 
 let queue: Queue<NewsletterSendJobData> | null = null;

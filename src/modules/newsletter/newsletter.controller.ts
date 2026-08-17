@@ -2,12 +2,13 @@ import type { NextFunction, Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../database/index.js";
-import { newsletters, users } from "../../database/schema/schema.js";
+import { newsletters, segments, users } from "../../database/schema/schema.js";
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { getNewsletterSendQueue } from "../../queue/newsletter-send.queue.js";
 import { contacts } from "../../database/schema/schema.js";
 import { createNewsletter, startNewsletterGeneration } from "./newsletter.service.js";
 import { BODY_MODEL_OPTIONS } from "../../shared/ai/ai.config.js";
+import { resolveSegmentWhereClause, type SegmentCondition } from "../../shared/segments/segments.service.js";
 
 const idParamSchema = z.string().uuid();
 
@@ -199,10 +200,27 @@ export class NewsletterController {
         });
       }
 
-      const count = await db.$count(
-        contacts,
-        and(eq(contacts.organizationId, req.user!.organizationId), eq(contacts.status, "subscribed")),
-      );
+      const { segmentId } = req.body as { segmentId?: string };
+
+      let audienceWhere = and(eq(contacts.organizationId, req.user!.organizationId), eq(contacts.status, "subscribed"));
+      if (segmentId) {
+        const [segment] = await db
+          .select({ rules: segments.rules })
+          .from(segments)
+          .where(and(eq(segments.id, segmentId), eq(segments.organizationId, req.user!.organizationId)))
+          .limit(1);
+
+        if (!segment) {
+          return res.status(404).json({ error: "Segment not found." });
+        }
+
+        const conditions = (segment.rules as { conditions: SegmentCondition[] }).conditions;
+        if (conditions.length > 0) {
+          audienceWhere = and(audienceWhere, resolveSegmentWhereClause(req.user!.organizationId, conditions));
+        }
+      }
+
+      const count = await db.$count(contacts, audienceWhere);
 
       if (count === 0) {
         return res
@@ -219,6 +237,7 @@ export class NewsletterController {
       await getNewsletterSendQueue().add("send", {
         newsletterId: newsletter.id,
         userId: req.user!.userId,
+        ...(segmentId ? { segmentId } : {}),
       });
 
       return res

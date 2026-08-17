@@ -5,9 +5,9 @@ jest.unstable_mockModule("../../database/index.js", () => ({
   db: createDbMock(),
 }));
 
-const { resolveSegmentWhereClause, segmentConditionSchema, upsertSegmentSchema } = await import(
-  "./segments.service.js"
-);
+const { resolveAudienceConditions, resolveSegmentWhereClause, segmentConditionSchema, upsertSegmentSchema } =
+  await import("./segments.service.js");
+const { db } = await import("../../database/index.js");
 
 describe("segmentConditionSchema", () => {
   it("accepts a tag condition", () => {
@@ -59,5 +59,28 @@ describe("resolveSegmentWhereClause", () => {
       { type: "tag", tagId: "00000000-0000-4000-8000-000000000001", negate: false },
     ]);
     expect(clause).toBeDefined();
+  });
+});
+
+describe("resolveAudienceConditions", () => {
+  it("returns an empty array for undefined audience (all contacts)", async () => {
+    expect(await resolveAudienceConditions("org-1", undefined)).toEqual([]);
+  });
+
+  it("returns an empty array for the literal 'all' audience", async () => {
+    expect(await resolveAudienceConditions("org-1", "all")).toEqual([]);
+  });
+
+  it("returns the segment's conditions when the segment exists in this org", async () => {
+    const conditions = [{ type: "status" as const, value: "subscribed" as const, negate: false }];
+    (db.limit as jest.Mock).mockResolvedValueOnce([{ rules: { conditions } }]);
+
+    expect(await resolveAudienceConditions("org-1", "segment-1")).toEqual(conditions);
+  });
+
+  it("returns null when the referenced segment no longer exists (never falls back to all)", async () => {
+    (db.limit as jest.Mock).mockResolvedValueOnce([]);
+
+    expect(await resolveAudienceConditions("org-1", "deleted-segment")).toBeNull();
   });
 });
