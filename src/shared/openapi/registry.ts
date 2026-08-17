@@ -355,6 +355,7 @@ registry.registerPath({
       limit: z.string().optional().openapi({ description: "Padrao 100, maximo 500" }),
       offset: z.string().optional(),
       tagId: z.string().uuid().optional().openapi({ description: "Filtra contacts que tem essa tag" }),
+      segmentId: z.string().uuid().optional().openapi({ description: "Filtra contacts que pertencem a esse segmento" }),
     }),
   },
   responses: { 200: { description: "Lista de contacts", content: { "application/json": { schema: z.object({ contacts: z.array(z.object({})) }) } } } },
