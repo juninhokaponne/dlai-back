@@ -328,14 +328,25 @@ registry.registerPath({
   method: "post",
   path: "/api/newsletters/{id}/send",
   tags: ["Newsletters"],
-  summary: "Envia a newsletter pronta para os contacts subscribed",
+  summary: "Envia a newsletter pronta para os contacts subscribed (ou para um segmento, se informado)",
   security: bearerAuth,
-  request: { params: uuidParam },
+  request: {
+    params: uuidParam,
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            segmentId: z.string().uuid().optional().openapi({ description: "Restringe o envio aos contacts desse segmento" }),
+          }),
+        },
+      },
+    },
+  },
   responses: {
     202: { description: "Envio enfileirado", content: { "application/json": { schema: z.object({ newsletter: z.object({}), recipientCount: z.number() }) } } },
     400: errorResponse("Sem contacts subscribed ou newsletter nao esta pronta"),
     403: errorResponse("Email do remetente ainda nao foi confirmado"),
-    404: errorResponse("Newsletter nao encontrada"),
+    404: errorResponse("Newsletter ou segmento nao encontrado"),
     409: errorResponse("Envio ja em andamento"),
   },
 });

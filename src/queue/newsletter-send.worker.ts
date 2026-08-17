@@ -5,6 +5,7 @@ import { newsletters, contacts, users } from "../database/schema/schema.js";
 import { ResendEmailProvider } from "../shared/email/resend.provider.js";
 import { personalizeContent } from "../shared/newsletter/personalize.js";
 import { injectTracking } from "../shared/email/tracking-injector.js";
+import { resolveAudienceConditions, resolveSegmentWhereClause } from "../shared/segments/segments.service.js";
 import { getRedisConnection } from "./redis-connection.js";
 import {
   NEWSLETTER_SEND_QUEUE,
@@ -36,7 +37,7 @@ function buildEmailHtml(content: string, unsubscribeUrl: string): string {
 }
 
 async function processJob(job: Job<NewsletterSendJobData>) {
-  const { newsletterId, userId, contactId, trackingSendEventId } = job.data;
+  const { newsletterId, userId, contactId, trackingSendEventId, segmentId } = job.data;
 
   const [newsletter] = await db
     .select()
@@ -57,11 +58,24 @@ async function processJob(job: Job<NewsletterSendJobData>) {
   const senderName = sender ? `${sender.name} ${sender.lastName}`.trim() : undefined;
   const sendDate = new Date().toLocaleDateString("pt-BR");
 
-  const recipientsWhere = contactId
+  let recipientsWhere = contactId
     ? and(eq(contacts.organizationId, newsletter.organizationId!), eq(contacts.id, contactId), eq(contacts.status, "subscribed"))
     : and(eq(contacts.organizationId, newsletter.organizationId!), eq(contacts.status, "subscribed"));
 
-  const recipients = await db.select().from(contacts).where(recipientsWhere);
+  // Same "unresolvable segment -> zero recipients, never everyone" rule as
+  // the automation send path - a deleted segment must not silently widen a
+  // deliberately-narrowed send.
+  let skipAll = false;
+  if (!contactId && segmentId) {
+    const conditions = await resolveAudienceConditions(newsletter.organizationId!, segmentId);
+    if (conditions === null) {
+      skipAll = true;
+    } else if (conditions.length > 0) {
+      recipientsWhere = and(recipientsWhere, resolveSegmentWhereClause(newsletter.organizationId!, conditions));
+    }
+  }
+
+  const recipients = skipAll ? [] : await db.select().from(contacts).where(recipientsWhere);
 
   const emailProvider = new ResendEmailProvider();
   let sent = 0;
