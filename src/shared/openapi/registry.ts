@@ -1090,6 +1090,36 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: "/api/analytics/overview",
+  tags: ["Analytics"],
+  summary: "Visao agregada de analytics: KPIs, tendencia diaria, performance por newsletter, funil de automacoes e saude dos contacts",
+  security: bearerAuth,
+  request: {
+    query: z.object({
+      days: z.string().optional().openapi({ description: "Janela em dias (7-90), padrao 30" }),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Visao geral de analytics",
+      content: {
+        "application/json": {
+          schema: z.object({
+            days: z.number(),
+            kpis: z.object({}),
+            trend: z.array(z.object({})),
+            newsletters: z.array(z.object({})),
+            automations: z.array(z.object({})),
+            contactHealth: z.object({}),
+          }),
+        },
+      },
+    },
+  },
+});
+
+registry.registerPath({
+  method: "get",
   path: "/api/segments",
   tags: ["Segments"],
   summary: "Lista os segmentos da organizacao",
