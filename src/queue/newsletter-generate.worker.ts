@@ -19,7 +19,7 @@ const logger = createLogger("newsletter-generate.worker");
 const aiService = new AIService(new OpenRouterProvider());
 
 async function processJob(job: Job<NewsletterGenerateJobData>) {
-  const { newsletterId, userId, bodyModel } = job.data;
+  const { newsletterId, userId, bodyModel, useImages, useLinks } = job.data;
 
   const [newsletter] = await db
     .select()
@@ -42,7 +42,7 @@ ${MATCH_INPUT_LANGUAGE_INSTRUCTION}`,
     "body",
     `Write the body of a newsletter email about this topic: "${newsletter.topic}". The newsletter's title is: "${title.content}". Be concise and engaging.
 
-${buildEmailDesignInstructions({ useImages: false, useLinks: true })}
+${buildEmailDesignInstructions({ useImages: useImages ?? true, useLinks: useLinks ?? true })}
 
 You can personalize the email using exactly these placeholders (with double curly braces), without inventing other variants: {{name}} for the subscriber's name, {{sender_name}} for the sender's name, {{company}} for the sender's company, and {{date}} for today's date. Only use the ones that make sense for the content - don't force the use of all of them.
 
