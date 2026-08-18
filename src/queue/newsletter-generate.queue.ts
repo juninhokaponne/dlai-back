@@ -9,6 +9,8 @@ export interface NewsletterGenerateJobData {
   userId: string;
   creditCost: number;
   bodyModel?: string;
+  useImages?: boolean;
+  useLinks?: boolean;
 }
 
 let queue: Queue<NewsletterGenerateJobData> | null = null;

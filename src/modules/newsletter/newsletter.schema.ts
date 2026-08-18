@@ -12,6 +12,8 @@ export const createNewsletterSchema = z.object({
 
 export const generateSchema = z.object({
   model: z.enum(bodyModelIds).optional(),
+  useImages: z.boolean().optional(),
+  useLinks: z.boolean().optional(),
 });
 
 export const updateNewsletterSchema = z.object({
