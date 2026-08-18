@@ -152,6 +152,8 @@ export class NewsletterController {
         req.user!.organizationId,
         req.user!.userId,
         req.body?.model,
+        req.body?.useImages,
+        req.body?.useLinks,
       );
 
       return res.status(202).json({ newsletter: updated, creditBalance });

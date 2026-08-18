@@ -20,6 +20,8 @@ export async function startNewsletterGeneration(
   organizationId: string,
   userId: string,
   bodyModel?: BodyModelId,
+  useImages?: boolean,
+  useLinks?: boolean,
 ) {
   let creditCost = GENERATION_CREDIT_COST;
 
@@ -53,6 +55,8 @@ export async function startNewsletterGeneration(
     userId,
     creditCost,
     ...(bodyModel ? { bodyModel } : {}),
+    ...(useImages !== undefined ? { useImages } : {}),
+    ...(useLinks !== undefined ? { useLinks } : {}),
   });
 
   return { newsletter: updated!, creditBalance };
