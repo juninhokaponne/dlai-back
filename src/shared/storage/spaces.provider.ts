@@ -57,4 +57,20 @@ export class SpacesStorageProvider {
   uploadAvatar(userId: string, buffer: Buffer, contentType: string, extension: string): Promise<string> {
     return this.uploadFile("avatars", userId, buffer, contentType, extension);
   }
+
+  // For shared, app-level assets that live at a fixed key (e.g. re-uploading
+  // overwrites the same object) rather than one file per user.
+  async uploadStaticAsset(key: string, buffer: Buffer, contentType: string): Promise<string> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        ACL: "public-read",
+      }),
+    );
+
+    return `${this.publicUrl}/${key}`;
+  }
 }
