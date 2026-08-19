@@ -705,6 +705,19 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "post",
+  path: "/api/workspace/transcribe",
+  tags: ["Workspace"],
+  summary: "Transcreve um audio (multipart/form-data, campo 'audio') via ElevenLabs (debita credito)",
+  security: bearerAuth,
+  responses: {
+    200: { description: "Transcricao gerada", content: { "application/json": { schema: z.object({ text: z.string(), creditBalance: z.number() }) } } },
+    400: errorResponse("Arquivo ausente ou formato invalido"),
+    402: errorResponse("Sem creditos suficientes"),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------

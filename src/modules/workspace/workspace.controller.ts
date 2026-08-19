@@ -5,12 +5,14 @@ import { contacts, newsletters, organizations, users } from "../../database/sche
 import type { AuthenticatedRequest } from "../../shared/middlewares/auth.js";
 import { AIService } from "../../shared/ai/ai.service.js";
 import { OpenRouterProvider } from "../../shared/ai/openrouter.provider.js";
+import { ElevenLabsProvider } from "../../shared/ai/elevenlabs.provider.js";
 import { createNewsletter, startNewsletterGeneration } from "../newsletter/newsletter.service.js";
 import { debitCredits } from "../../shared/billing/credits.service.js";
 import { QUICK_ACTION_CREDIT_COST } from "../../shared/billing/credits.config.js";
 import { MATCH_INPUT_LANGUAGE_INSTRUCTION, languageInstructionForLocale } from "../../shared/ai/language-instruction.js";
 
 const aiService = new AIService(new OpenRouterProvider());
+const elevenLabsProvider = new ElevenLabsProvider();
 const MAX_SUGGESTIONS = 5;
 const RECENT_TOPICS_SAMPLE = 10;
 
@@ -191,6 +193,30 @@ ${languageInstructionForLocale(user?.locale ?? "en")}`;
       );
 
       return res.status(202).json({ newsletter: updated, creditBalance });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async transcribe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: "Audio file is required (field 'audio')." });
+      }
+
+      const { organizationId, userId } = req.user!;
+
+      const creditBalance = await debitCredits({
+        organizationId,
+        userId,
+        amount: QUICK_ACTION_CREDIT_COST,
+        reason: "generation_debit",
+      });
+
+      const text = await elevenLabsProvider.transcribe(file.buffer, file.originalname || "recording", file.mimetype);
+
+      return res.json({ text, creditBalance });
     } catch (err) {
       next(err);
     }

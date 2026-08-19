@@ -1,9 +1,12 @@
-export const PLACEHOLDER_IMAGE_DATA_URI =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAEElEQVR4nGN4+vw1HDEgcwAaURW5zOzFqAAAAABJRU5ErkJggg==";
+// A real hosted image, not a data: URI - Outlook and several other email
+// clients strip base64-embedded images entirely, which left this placeholder
+// invisible in real inboxes even though it rendered fine in the browser.
+export const PLACEHOLDER_IMAGE_URL =
+  "https://lettergo.nyc3.digitaloceanspaces.com/static/newsletter-image-placeholder.png";
 
 export function buildEmailDesignInstructions(options: { useImages?: boolean; useLinks?: boolean } = {}): string {
   const imageInstruction = options.useImages
-    ? `- Include at least one image using exactly this tag near the top or at a relevant point: <img src="${PLACEHOLDER_IMAGE_DATA_URI}" alt="[describe the ideal image for this spot, in the same language as the content]" style="width:100%;max-width:600px;height:auto;border-radius:8px;display:block;margin:0 0 20px;" /> - this is a placeholder the user will replace with a real photo later, but it should occupy a prominent space as if it were a real image.`
+    ? `- Include at least one image using exactly this tag near the top or at a relevant point: <img src="${PLACEHOLDER_IMAGE_URL}" alt="[describe the ideal image for this spot, in the same language as the content]" style="width:100%;max-width:600px;height:auto;border-radius:8px;display:block;margin:0 0 20px;" /> - this is a placeholder the user will replace with a real photo later, but it should occupy a prominent space as if it were a real image.`
     : `- Do not include any <img> tag.`;
 
   const linkInstruction = options.useLinks
