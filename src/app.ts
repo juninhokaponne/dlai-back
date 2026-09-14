@@ -38,9 +38,17 @@ app.use(
     // credentials into logs and is mostly noise. `id` is pino-http's
     // auto-generated per-request correlation id (reqId); userId is filled
     // in once requireAuth resolves the request (undefined for public
-    // routes) so a user's activity can be filtered across requests.
+    // routes) so a user's activity can be filtered across requests. `ip`
+    // and `userAgent` are pulled out individually (not the full headers
+    // object) so abuse/scan investigation doesn't need shell access.
     serializers: {
-      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      req: (req) => ({
+        id: req.id,
+        method: req.method,
+        url: req.url,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"],
+      }),
       res: (res) => ({ statusCode: res.statusCode }),
     },
     customProps: (req) => ({
