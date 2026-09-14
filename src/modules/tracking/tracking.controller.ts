@@ -36,24 +36,37 @@ export class TrackingController {
   async click(req: Request, res: Response, next: NextFunction) {
     try {
       const parsedId = idParamSchema.safeParse(req.params.sendEventId);
-      const encodedUrl = typeof req.query.u === "string" ? req.query.u : "";
-
       let targetUrl = "/";
-      try {
-        const decoded = Buffer.from(encodedUrl, "base64url").toString("utf-8");
-        const parsed = new URL(decoded);
-        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-          targetUrl = decoded;
-        }
-      } catch {
-        // Falls back to "/" below.
-      }
 
       if (parsedId.success) {
-        await db
-          .update(emailSendEvents)
-          .set({ clickedAt: new Date() })
-          .where(and(eq(emailSendEvents.id, parsedId.data), isNull(emailSendEvents.clickedAt)));
+        // Only honor the caller-supplied destination once we've confirmed
+        // sendEventId is a real tracked event, not just a well-formed UUID -
+        // otherwise this endpoint is an open redirect: anyone can send
+        // /api/t/c/<any-uuid>?u=<base64url(evil-url)> and get lettergo.app
+        // to redirect them anywhere, with no real send event required.
+        const [event] = await db
+          .select({ id: emailSendEvents.id })
+          .from(emailSendEvents)
+          .where(eq(emailSendEvents.id, parsedId.data))
+          .limit(1);
+
+        if (event) {
+          await db
+            .update(emailSendEvents)
+            .set({ clickedAt: new Date() })
+            .where(and(eq(emailSendEvents.id, parsedId.data), isNull(emailSendEvents.clickedAt)));
+
+          const encodedUrl = typeof req.query.u === "string" ? req.query.u : "";
+          try {
+            const decoded = Buffer.from(encodedUrl, "base64url").toString("utf-8");
+            const parsed = new URL(decoded);
+            if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+              targetUrl = decoded;
+            }
+          } catch {
+            // Falls back to "/" below.
+          }
+        }
       }
 
       return res.redirect(302, targetUrl);
