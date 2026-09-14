@@ -16,6 +16,8 @@ export function mockResponse(): Response {
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
   res.send = jest.fn().mockReturnValue(res);
+  res.set = jest.fn().mockReturnValue(res);
+  res.redirect = jest.fn() as unknown as Response["redirect"];
 
   return res;
 }
